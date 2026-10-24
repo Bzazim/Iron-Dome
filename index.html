@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0B1311">
+<meta name="apple-mobile-web-app-title" content="כיפת ברזל">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>כיפת ברזל</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0B1311;
+  --panel: rgba(13, 24, 21, .92);
+  --line: #24403A;
+  --ink: #D8EDE6;
+  --muted: #7FA096;
+  --green: #3DDC97;
+  --cyan: #4FD1E8;
+  --amber: #F2B33D;
+  --red: #FF4D4D;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); }
+body {
+  height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+  font-family: "Rubik", "Arial Hebrew", "Segoe UI", system-ui, sans-serif;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* top status bar */
+#hud {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
+  background: var(--panel); border-bottom: 1px solid var(--line); font-size: 13px;
+}
+#hud .wave { font-weight: 700; color: var(--green); letter-spacing: .02em; }
+.meter { display: flex; align-items: center; gap: 6px; }
+.meter .lbl { color: var(--muted); }
+button.meter { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button.meter .lbl { text-decoration: underline dotted; text-underline-offset: 3px; }
+.bar { width: 64px; height: 6px; border-radius: 3px; background: #1B2E29; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 50%; background: var(--green); transition: width .3s, background .3s; }
+.stat { color: var(--muted); }
+.stat b { color: var(--ink); font-weight: 500; }
+#hud .spacer { flex: 1; }
+.btn {
+  font: inherit; color: var(--ink); background: #142520; border: 1px solid var(--line);
+  border-radius: 8px; padding: 5px 10px; cursor: pointer; min-width: 36px;
+}
+.btn:hover { background: #1B332C; }
+.btn.on { border-color: var(--green); color: var(--green); }
+
+/* red alert strip */
+#alerts {
+  min-height: 0; padding: 0 16px; background: #3A0E10; color: #FFD6D6;
+  font-size: 13px; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  transition: padding .2s;
+}
+#alerts.on { padding: 6px 16px; animation: blink 1s infinite alternate; }
+@keyframes blink { from { background: #3A0E10; } to { background: #5C1418; } }
+
+#stage { position: relative; flex: 1; min-height: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+#placeBar {
+  position: absolute; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 3; width: max-content; max-width: calc(100% - 32px); box-sizing: border-box;
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; border-radius: 12px;
+  background: rgba(15, 28, 25, .95); border: 1px solid #86EFAC; color: var(--ink); font-size: 13px;
+}
+#placeBar .btn { border-color: #86EFAC; color: #86EFAC; flex: none; }
+#views { position: absolute; top: 10px; left: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+#views .btn { font-size: 12.5px; background: rgba(20, 37, 32, .9); }
+
+#log {
+  position: absolute; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); right: 16px; left: 16px;
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start; pointer-events: none;
+}
+#log div {
+  font-size: 12.5px; padding: 4px 10px; border-radius: 6px; background: rgba(8, 16, 14, .85);
+  border: 1px solid var(--line); max-width: 100%; transition: opacity .6s;
+}
+#log .good { color: var(--green); }
+#log .bad { color: var(--red); }
+#log .warn { color: var(--amber); }
+
+/* overlays */
+.overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 10, 9, .72); padding: 16px; z-index: 5;
+}
+.card {
+  width: 100%; max-width: 440px; max-height: 100%; overflow: auto; box-sizing: border-box;
+  background: #0F1C19; border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
+}
+.card.wide { max-width: 600px; }
+.card h1 { margin: 0 0 4px; font-size: 26px; color: var(--green); }
+.card h2 { margin: 0 0 8px; font-size: 19px; }
+.card .kicker { font-size: 12px; color: var(--amber); letter-spacing: .06em; margin-bottom: 6px; }
+.card p { margin: 0 0 12px; line-height: 1.55; color: #B9D2CA; font-size: 14.5px; }
+.card ul { margin: 0 0 14px; padding-inline-start: 18px; line-height: 1.6; font-size: 14px; color: #B9D2CA; }
+.card .key { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-inline-end: 4px; }
+.card .sub { font-size: 12.5px; color: var(--muted); margin: 14px 0 6px; }
+.opts { display: flex; flex-direction: column; gap: 8px; }
+.opt {
+  font: inherit; text-align: start; color: var(--ink); background: #142520; border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px; cursor: pointer;
+}
+.opt:hover { border-color: var(--green); background: #183029; }
+.opt b { display: block; font-size: 15px; font-weight: 500; margin-bottom: 2px; }
+.opt span { font-size: 12.5px; color: var(--muted); }
+.primary {
+  font: inherit; font-size: 16px; font-weight: 700; width: 100%; padding: 12px; border: 0; border-radius: 10px;
+  background: var(--green); color: #06120E; cursor: pointer;
+}
+.primary:disabled { opacity: .4; cursor: not-allowed; }
+.ghost { font: inherit; font-size: 15px; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+.row { display: flex; gap: 8px; }
+.row .primary { flex: 1; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.grid2 div { background: #142520; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; color: var(--muted); }
+.grid2 b { display: block; font-size: 18px; color: var(--ink); font-weight: 500; }
+
+/* strike planner */
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.chip {
+  position: relative; font: inherit; text-align: start; color: var(--ink); background: #142520; border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+}
+.chip b { font-size: 15px; font-weight: 500; }
+.chip span { font-size: 11.5px; color: var(--muted); }
+.chip .tag { font-style: normal; font-size: 11px; align-self: flex-start; margin-top: 3px; padding: 1px 7px; border-radius: 99px; background: #3A1D1D; color: #FF9C9C; }
+.chip .tag.neutral { background: #1D2E3A; color: #9CD2FF; }
+.chip .tag.fire { background: #5C1418; color: #FFD6D6; }
+.chip .count { position: absolute; top: 6px; left: 8px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--green); color: #06120E; font-size: 12px; font-weight: 700; display: grid; place-items: center; padding: 0 5px; box-sizing: border-box; }
+.chip.sel { border-color: var(--green); background: #183029; box-shadow: inset 0 0 0 1px var(--green); }
+.plane { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: #142520; }
+.plane.off { opacity: .45; }
+.plane .info { flex: 1; min-width: 0; }
+.plane .info b { display: block; font-size: 14.5px; font-weight: 500; }
+.plane .info span { font-size: 12px; color: var(--muted); }
+.stepper { display: flex; align-items: center; gap: 4px; }
+.stepper button { font: inherit; font-size: 18px; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: #0F1C19; color: var(--ink); cursor: pointer; }
+.stepper button:disabled { opacity: .35; cursor: not-allowed; }
+.stepper output { min-width: 22px; text-align: center; font-weight: 700; font-size: 16px; }
+.missions { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: #0B1613; border: 1px dashed var(--line); font-size: 13.5px; line-height: 1.7; }
+.missions .empty { color: var(--muted); }
+.outcome { margin: 12px 0 14px; font-size: 13.5px; line-height: 1.6; color: #B9D2CA; }
+.outcome .warn { color: var(--amber); }
+.outcome .bad { color: #FF9C9C; }
+
+/* settings */
+.toggle { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; cursor: pointer; }
+.toggle input { width: 20px; height: 20px; accent-color: var(--green); margin: 0; flex: none; }
+.toggle small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.slider { display: flex; gap: 12px; align-items: center; padding: 14px 0 18px; font-size: 14.5px; }
+.slider input { flex: 1; accent-color: var(--green); }
+
+/* foreign relations panel */
+.side {
+  position: absolute; top: 10px; right: 12px; width: 270px; max-height: calc(100% - 20px); overflow: auto; box-sizing: border-box;
+  background: rgba(15, 28, 25, .95); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; z-index: 4;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+}
+.side h2 { margin: 0 0 2px; font-size: 17px; }
+.side .avg { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+.side h3 { margin: 12px 0 6px; font-size: 12px; color: var(--amber); font-weight: 500; letter-spacing: .04em; }
+.rel { display: grid; grid-template-columns: 1fr 70px 26px; align-items: center; gap: 8px; font-size: 13.5px; padding: 3px 0; }
+.rel .bar { width: 100%; }
+.rel b { font-weight: 500; text-align: left; font-variant-numeric: tabular-nums; }
+.rel small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; margin-top: -2px; }
+button.rel { width: 100%; font: inherit; color: inherit; background: none; border: 0; text-align: start; cursor: pointer; border-radius: 6px; padding: 4px 4px; }
+button.rel:hover, button.rel.open { background: #183029; }
+.opts.diplo { margin: 4px 0 8px; gap: 5px; }
+.opts.diplo .opt { padding: 7px 10px; }
+.opts.diplo .opt b { font-size: 13.5px; }
+.opts.diplo .opt span { font-size: 11.5px; }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin: 10px 0 12px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-inline-end: 4px; }
+.tabs { display: flex; gap: 6px; margin: 4px 0 12px; border-bottom: 1px solid var(--line); }
+.tab { font: inherit; font-size: 14px; padding: 8px 12px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; margin-bottom: -1px; }
+.tab.sel { color: var(--green); border-bottom-color: var(--green); }
+.opt.sel { border-color: var(--green); background: #183029; box-shadow: inset 0 0 0 1px var(--green); }
+.opt:disabled { opacity: .45; cursor: not-allowed; }
+.coal { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.coal b { display: block; font-size: 14px; font-weight: 500; }
+.coal p { margin: 3px 0; font-size: 12.5px; color: #B9D2CA; line-height: 1.45; }
+.coal small { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
+.coal button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--green); background: #183029; color: var(--green); cursor: pointer; }
+.coal button:disabled { border-color: var(--line); background: transparent; color: var(--muted); cursor: default; }
+.coal.on b { color: var(--green); }
+.buy { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.buy span { flex-basis: 100%; font-size: 11.5px; color: var(--muted); }
+.buy button { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--green); background: #183029; color: var(--green); cursor: pointer; }
+.buy button:disabled { border-color: var(--line); background: transparent; color: var(--muted); cursor: default; }
+.buy select { font: inherit; font-size: 13px; padding: 5px 6px; border-radius: 8px; border: 1px solid var(--line); background: #0F1C19; color: var(--ink); }
+@media (max-width: 520px) {
+  #hud { gap: 4px 10px; font-size: 12px; }
+  .bar { width: 40px; }
+  #hud .hide-sm { display: none; }
+  .side { top: auto; bottom: 8px; right: 8px; left: 8px; width: auto; max-height: 46%; }
+}
+</style>
+</head>
+<body>
+<div id="hud">
+  <span class="wave">גל <span id="waveNo" class="num">1</span></span>
+  <span class="meter"><span class="lbl">אמון</span><span class="bar"><i id="trustBar"></i></span></span>
+  <button class="meter" id="relBtn" title="מפת יחסי חוץ"><span class="lbl">יחסי חוץ</span><span class="bar"><i id="relBar"></i></span></button>
+  <span class="meter"><span class="lbl">הרתעה</span><span class="bar"><i id="detBar"></i></span></span>
+  <span class="meter"><span class="lbl">כלכלה</span><span class="bar"><i id="econBar"></i></span></span>
+  <span class="stat">תקציב <b id="budget" class="num">$0M</b></span>
+  <span class="stat">כיפה <b id="reserve" class="num">0</b></span>
+  <span class="stat">קלע <b id="stunners" class="num">0</b></span>
+  <span class="stat">חץ <b id="arrows" class="num">0</b></span>
+  <span class="stat hide-sm">יירוטים <b id="kills" class="num">0</b></span>
+  <span class="stat hide-sm">עלות <b id="cost" class="num">$0</b></span>
+  <span class="spacer"></span>
+  <button class="btn" id="shopBtn" title="רכש" aria-label="רכש">🛒</button>
+  <button class="btn" id="coopBtn" title="שיתופי פעולה" aria-label="שיתופי פעולה">🤝</button>
+  <button class="btn" id="diplBtn" title="מפת יחסי חוץ" aria-label="מפת יחסי חוץ">🌐</button>
+  <button class="btn" id="speedBtn" title="מהירות">×1</button>
+  <button class="btn" id="pauseBtn" title="השהיה">❚❚</button>
+  <button class="btn" id="settingsBtn" title="הגדרות" aria-label="הגדרות">⚙</button>
+</div>
+<div id="alerts"></div>
+<div id="stage">
+  <canvas id="map"></canvas>
+  <div id="placeBar" hidden><span id="placeText"></span><button class="btn" id="placeDone">סיום</button></div>
+  <div id="views">
+    <button class="btn" id="viewIsrael">ישראל</button>
+    <button class="btn" id="viewRegion">המזרח התיכון</button>
+  </div>
+  <div id="log"></div>
+
+  <div id="dipl" class="side" hidden>
+    <h2>יחסי חוץ</h2>
+    <div class="avg" id="diplAvg"></div>
+    <div class="legend">
+      <span><i style="background:#2F8A5B"></i>ידידותי</span><span><i style="background:#9A7A2A"></i>מתוח</span>
+      <span><i style="background:#8A3030"></i>עוין</span><span><i style="background:#3B1416;border:1px solid #6B2A2E"></i>אויב</span>
+    </div>
+    <h3>פעולות דיפלומטיות</h3>
+    <div class="avg">לחץ על מדינה כדי לראות מה אפשר לעשות מולה. פעולה אחת מול כל מדינה בכל גל.</div>
+    <div class="opts diplo" id="diplGlobal"></div>
+    <h3>מעצמות</h3>
+    <div id="diplPowers"></div>
+    <h3>באזור</h3>
+    <div id="diplRegion"></div>
+    <button class="primary" id="diplClose" style="margin-top:12px">חזרה לחמ״ל</button>
+  </div>
+
+  <div id="shop" class="side" hidden>
+    <h2>🛒 רכש</h2>
+    <div class="avg" id="shopBudget"></div>
+    <div id="shopList"></div>
+    <button class="primary" id="shopClose" style="margin-top:12px">חזרה לחמ״ל</button>
+  </div>
+
+  <div id="coop" class="side" hidden>
+    <h2>🤝 שיתופי פעולה</h2>
+    <div class="avg">מדינות שמתמודדות עם אותו איום יכולות לעבוד איתך, כשהיחסים איתן מספיק טובים.</div>
+    <div id="coopList"></div>
+    <button class="primary" id="coopClose" style="margin-top:12px">חזרה לחמ״ל</button>
+  </div>
+
+  <div class="overlay" id="intro">
+    <div class="card">
+      <div class="kicker">חמ״ל הגנה אווירית</div>
+      <h1>כיפת ברזל</h1>
+      <p>טילים ורקטות משוגרים לעבר ישראל. אתה המפעיל: מחליט מה ליירט ומה להשאיר.</p>
+      <button class="primary" id="resumeBtn" hidden style="margin-bottom:6px"></button>
+      <p id="savedAt" hidden style="font-size:12px;color:var(--muted);text-align:center;margin:0 0 10px"></p>
+      <button class="ghost" id="helpBtn" hidden style="width:100%;margin-bottom:10px">איך משחקים ▾</button>
+      <ul id="introHelp">
+        <li>לחיצה על איום (או על נקודת הפגיעה הצפויה) משגרת מיירט מהסוללה הקרובה.</li>
+        <li><span class="key" style="background:var(--red)"></span>טבעת אדומה: האיום ייפול בעיר. חייבים ליירט.</li>
+        <li><span class="key" style="background:#7d8b87"></span>טבעת אפורה: ייפול בשטח פתוח. אפשר לחסוך מיירט.</li>
+        <li>שלוש שכבות הגנה: <span style="color:#4FD1E8">כיפת ברזל ▲</span> לרקטות וכטב״מים, <span style="color:#FDBA74">קלע דוד ■</span> לטילים כבדים וטילי שיוט <span style="color:#FB7185">(ריבוע ורוד)</span>, <span style="color:#C4B5FD">חץ ◆</span> לטילים בליסטיים <span style="color:#E879F9">(סגול)</span>.</li>
+        <li>בין הגלים: החלטת קבינט ותקיפות של חיל האוויר, אפשר בכמה מדינות בבת אחת. תקיפה במדינה ניטרלית מעלה הרתעה, אבל היא תגיב בירי.</li>
+        <li>חיסולים ממוקדים של בכירים: מעלים הרתעה ומשבשים את הארגון, אבל קודם מביאים ירי נקמה.</li>
+        <li>ככל שאזור יורה יותר על ישראל, תקיפה שם פוגעת פחות ביחסי החוץ (לגיטימציה).</li>
+        <li>🌐 מפת יחסי החוץ: ארה״ב ואירופה שולחות מיירטים רק כשהיחסים טובים, </li>
+        <li>💰 התקציב גדל אחרי כל גל לפי אמון הציבור ומצב הכלכלה. נפילות בערים פוגעות בכלכלה. 🛒 ברכש קונים מיירטים וסוללות.</li>
+        <li>🤝 שיתופי פעולה: מדינות עם איום משותף עוזרות ביירוט ובמודיעין.</li>
+        <li>אם אמון הציבור מגיע לאפס, המשחק נגמר.</li>
+      </ul>
+      <button class="primary" id="startBtn">התחל משמרת</button>
+      <p id="best" style="margin:10px 0 0;font-size:12.5px;color:var(--muted);text-align:center"></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="decision" hidden>
+    <div class="card">
+      <div class="kicker" id="decKicker">החלטת קבינט</div>
+      <h2 id="decTitle"></h2>
+      <p id="decText"></p>
+      <div class="opts" id="decOpts"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="strike" hidden>
+    <div class="card wide">
+      <div class="kicker" id="strikeKicker">חדר מבצעים</div>
+      <h2>תקיפות של חיל האוויר</h2>
+      <div class="tabs"><button class="tab sel" id="tabAir">תקיפות אוויריות</button><button class="tab" id="tabKill">חיסולים ממוקדים</button></div>
+      <div id="airPane">
+        <p style="font-size:13px;margin-bottom:10px">בחר יעד, קבע כמה מטוסים מכל סוג לשלוח אליו, ועבור ליעד הבא. כל המשימות יוצאות יחד.</p>
+        <div class="chips" id="strikeCountries"></div>
+        <div id="planesBox" hidden>
+          <div class="sub" id="planesTitle"></div>
+          <div class="opts" id="strikePlanes"></div>
+        </div>
+      </div>
+      <div id="killPane" hidden>
+        <p style="font-size:13px;margin-bottom:10px">הקבינט מאשר חיסול אחד בכל הפסקה. חיסול מעלה הרתעה ומשבש את הארגון, אבל קודם כול מביא ירי נקמה. מחליף מתמנה אחרי 5 גלים.</p>
+        <div class="opts" id="killList"></div>
+      </div>
+      <div class="missions" id="strikeMissions"></div>
+      <div class="outcome" id="strikeOutcome"></div>
+      <div class="row">
+        <button class="primary" id="strikeGo" disabled>בצע תקיפות</button>
+        <button class="ghost" id="strikeSkip">בלי תקיפה</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="result" hidden>
+    <div class="card">
+      <div class="kicker">דיווח מחיל האוויר</div>
+      <h2 id="resTitle"></h2>
+      <ul id="resLines"></ul>
+      <button class="primary" id="resNext">לגל הבא</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="settings" hidden>
+    <div class="card">
+      <div class="kicker">הגדרות</div>
+      <h2>צלילים</h2>
+      <label class="toggle"><input type="checkbox" id="setSiren"><span>אזעקה עולה ויורדת בזמן התרעה</span></label>
+      <label class="toggle"><input type="checkbox" id="setVoice"><span>הקראה ״צבע אדום״ ושם העיר <small id="voiceNote"></small></span></label>
+      <label class="toggle"><input type="checkbox" id="setSfx"><span>שיגורים, יירוטים ופיצוצים</span></label>
+      <label class="slider"><span>עוצמה</span><input type="range" id="setVol" min="0" max="1" step="0.05"></label>
+      <div class="row">
+        <button class="ghost" id="setMute">השתק הכול</button>
+        <button class="primary" id="setClose">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="card">
+      <div class="kicker">סוף המשמרת</div>
+      <h2 id="overTitle">אמון הציבור קרס</h2>
+      <div class="grid2" id="overStats"></div>
+      <button class="primary" id="againBtn">משמרת חדשה</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ---------- geography ----------
+// Positions are kept in km on a flat map centred on 31.5°N 35°E.
+const KM_LON = 94.35, KM_LAT = 111;   // km per degree around latitude 31.8
+const km = (lat, lon) => ({ x: (lon - 35) * KM_LON, y: (lat - 31.5) * KM_LAT });
+const poly = (pts) => pts.map(([a, b]) => km(a, b));
+
+// Country outlines from Natural Earth (public domain), simplified, as [lat, lon] rings.
+const REGION_LL = {"il":[[[31.212,34.249],[31.256,34.317],[31.29,34.35],[31.357,34.346],[31.393,34.368],[31.52,34.53],[31.541,34.53],[31.584,34.483],[31.766,34.609],[31.926,34.692],[31.952,34.713],[32.045,34.746],[32.06,34.742],[32.067,34.757],[32.281,34.839],[32.725,34.944],[32.815,34.947],[32.835,34.955],[32.842,34.969],[32.825,35.019],[32.859,35.063],[32.906,35.081],[32.923,35.066],[32.999,35.077],[33.051,35.095],[33.068,35.091],[33.081,35.106],[33.088,35.099],[33.083,35.185],[33.095,35.207],[33.102,35.282],[33.09,35.307],[33.058,35.333],[33.056,35.347],[33.088,35.48],[33.147,35.513],[33.222,35.52],[33.281,35.549],[33.282,35.563],[33.24,35.603],[33.271,35.61],[33.276,35.642],[33.323,35.7],[33.343,35.768],[33.407,35.822],[33.36,35.811],[33.335,35.765],[33.313,35.801],[33.272,35.768],[33.249,35.804],[33.201,35.808],[33.19,35.829],[33.161,35.833],[33.127,35.811],[33.112,35.811],[33.098,35.847],[32.99,35.858],[32.945,35.887],[32.865,35.837],[32.828,35.833],[32.744,35.757],[32.712,35.685],[32.686,35.653],[32.681,35.613],[32.641,35.559],[32.62,35.574],[32.607,35.567],[32.56,35.581],[32.546,35.567],[32.553,35.559],[32.526,35.567],[32.526,35.552],[32.497,35.581],[32.47,35.559],[32.463,35.574],[32.45,35.559],[32.443,35.567],[32.436,35.552],[32.435,35.559],[32.43,35.552],[32.414,35.559],[32.409,35.545],[32.384,35.559],[32.414,35.408],[32.44,35.401],[32.494,35.394],[32.511,35.361],[32.511,35.271],[32.543,35.21],[32.541,35.192],[32.507,35.153],[32.463,35.063],[32.435,35.045],[32.345,35.023],[32.339,35.005],[32.323,34.998],[32.278,34.991],[32.268,35.009],[32.244,35.009],[32.187,34.947],[32.129,34.969],[32.035,34.98],[31.948,34.976],[31.876,35.009],[31.854,34.955],[31.837,34.944],[31.82,34.955],[31.815,35.005],[31.842,35.045],[31.805,35.181],[31.783,35.207],[31.744,35.207],[31.726,35.106],[31.612,34.955],[31.582,34.937],[31.494,34.926],[31.396,34.868],[31.363,34.879],[31.346,34.926],[31.363,35.041],[31.363,35.163],[31.381,35.225],[31.459,35.333],[31.487,35.39],[31.493,35.459],[31.423,35.459],[31.332,35.415],[31.303,35.423],[31.258,35.397],[31.231,35.401],[31.133,35.444],[31.104,35.437],[31.025,35.39],[30.964,35.387],[30.89,35.322],[30.822,35.318],[30.78,35.279],[30.719,35.264],[30.618,35.207],[30.43,35.142],[30.407,35.142],[30.361,35.163],[30.245,35.124],[30.123,35.145],[30.034,35.088],[29.995,35.073],[29.924,35.055],[29.843,35.048],[29.733,35.001],[29.652,34.991],[29.608,34.965],[29.546,34.951],[29.493,34.915],[29.49,34.886],[29.546,34.854],[29.569,34.847],[29.638,34.85],[29.741,34.825],[29.941,34.742],[30.013,34.735],[30.344,34.598],[30.41,34.526],[30.483,34.537],[30.53,34.505],[30.652,34.479],[30.994,34.328],[31.212,34.249]]],"ps":[[[31.584,34.483],[31.541,34.53],[31.52,34.53],[31.393,34.368],[31.357,34.346],[31.29,34.35],[31.256,34.317],[31.224,34.263],[31.212,34.249],[31.276,34.224],[31.314,34.199],[31.376,34.281],[31.408,34.303],[31.438,34.35],[31.469,34.368],[31.535,34.443],[31.584,34.483]],[[32.384,35.559],[32.367,35.567],[32.376,35.552],[32.328,35.556],[32.313,35.567],[32.283,35.559],[32.252,35.574],[32.237,35.559],[32.237,35.574],[32.175,35.556],[32.154,35.559],[32.148,35.545],[32.136,35.552],[32.111,35.534],[32.087,35.545],[32.075,35.527],[32.058,35.523],[32.011,35.523],[31.945,35.545],[31.932,35.541],[31.92,35.523],[31.839,35.549],[31.82,35.538],[31.766,35.559],[31.736,35.527],[31.641,35.48],[31.491,35.459],[31.487,35.39],[31.459,35.333],[31.381,35.225],[31.363,35.163],[31.363,35.041],[31.346,34.926],[31.363,34.879],[31.396,34.868],[31.494,34.926],[31.582,34.937],[31.612,34.955],[31.726,35.106],[31.744,35.189],[31.739,35.203],[31.783,35.207],[31.795,35.199],[31.842,35.045],[31.815,35.005],[31.82,34.955],[31.837,34.944],[31.854,34.955],[31.876,35.009],[31.948,34.976],[32.035,34.98],[32.129,34.969],[32.187,34.947],[32.244,35.009],[32.268,35.009],[32.278,34.991],[32.323,34.998],[32.339,35.005],[32.345,35.023],[32.435,35.045],[32.463,35.063],[32.507,35.153],[32.541,35.192],[32.543,35.21],[32.511,35.271],[32.511,35.361],[32.494,35.394],[32.414,35.408],[32.384,35.559]]],"lb":[[[33.088,35.106],[33.225,35.207],[33.281,35.189],[33.458,35.271],[33.514,35.351],[33.804,35.477],[33.902,35.469],[33.911,35.574],[34.0,35.642],[34.201,35.628],[34.311,35.664],[34.316,35.707],[34.39,35.75],[34.415,35.808],[34.464,35.804],[34.478,35.905],[34.539,35.984],[34.65,35.97],[34.627,36.261],[34.687,36.308],[34.63,36.366],[34.63,36.441],[34.598,36.438],[34.596,36.387],[34.554,36.384],[34.513,36.319],[34.478,36.441],[34.414,36.531],[34.353,36.517],[34.307,36.578],[34.245,36.567],[34.199,36.603],[34.054,36.474],[34.044,36.391],[33.965,36.301],[33.907,36.269],[33.858,36.369],[33.824,36.359],[33.851,36.139],[33.816,36.049],[33.64,35.923],[33.598,36.031],[33.568,36.035],[33.527,35.934],[33.463,35.919],[33.336,35.757],[33.271,35.61],[33.24,35.603],[33.281,35.549],[33.088,35.48],[33.056,35.347],[33.102,35.282],[33.088,35.106]]],"sy":[[[32.744,35.757],[32.945,35.887],[33.098,35.847],[33.112,35.811],[33.19,35.829],[33.272,35.768],[33.313,35.801],[33.335,35.765],[33.463,35.919],[33.527,35.934],[33.568,36.035],[33.598,36.031],[33.64,35.923],[33.71,35.948],[33.816,36.049],[33.851,36.139],[33.824,36.359],[33.858,36.369],[33.907,36.269],[33.965,36.301],[34.044,36.391],[34.054,36.474],[34.199,36.603],[34.245,36.567],[34.307,36.578],[34.353,36.517],[34.422,36.524],[34.495,36.434],[34.513,36.319],[34.554,36.384],[34.596,36.387],[34.598,36.438],[34.63,36.441],[34.63,36.366],[34.687,36.308],[34.627,36.261],[34.65,35.97],[34.924,35.865],[35.022,35.901],[35.109,35.887],[35.197,35.963],[35.288,35.916],[35.418,35.919],[35.51,35.819],[35.505,35.772],[35.542,35.779],[35.576,35.725],[35.613,35.779],[35.668,35.772],[35.743,35.84],[35.849,35.797],[35.852,35.873],[35.918,35.912],[35.927,35.981],[35.869,36.002],[35.822,36.157],[35.952,36.197],[35.959,36.269],[36.001,36.297],[35.994,36.359],[36.227,36.373],[36.2,36.452],[36.226,36.481],[36.237,36.672],[36.307,36.65],[36.334,36.578],[36.366,36.596],[36.479,36.531],[36.828,36.639],[36.754,36.963],[36.707,37.017],[36.643,37.014],[36.621,37.053],[36.658,37.219],[36.634,37.446],[36.732,37.655],[36.761,37.82],[36.908,38.223],[36.855,38.479],[36.693,38.724],[36.702,39.033],[36.661,39.239],[36.742,39.764],[36.806,39.98],[37.004,40.412],[37.1,40.707],[37.122,40.898],[37.065,41.201],[37.075,41.481],[37.176,42.011],[37.325,42.212],[37.288,42.223],[37.284,42.291],[37.24,42.345],[37.171,42.335],[37.061,42.378],[36.617,41.845],[36.516,41.384],[36.356,41.276],[36.06,41.237],[35.825,41.355],[35.624,41.359],[35.494,41.262],[35.243,41.201],[34.768,41.197],[34.402,40.967],[34.331,40.689],[33.372,38.774],[32.317,36.819],[32.379,36.387],[32.528,36.179],[32.517,36.067],[32.644,36.009],[32.658,35.955],[32.691,35.945],[32.744,35.757]]],"jo":[[[32.744,35.757],[32.691,35.945],[32.658,35.955],[32.644,36.009],[32.517,36.067],[32.528,36.179],[32.379,36.387],[32.313,36.805],[33.372,38.774],[32.497,39.059],[32.475,38.979],[32.328,39.03],[32.308,39.048],[32.354,39.235],[32.244,39.293],[31.994,38.965],[31.491,36.96],[30.498,37.982],[30.331,37.647],[29.995,37.471],[29.853,36.729],[29.495,36.477],[29.199,36.071],[29.351,34.951],[29.519,34.998],[29.586,34.958],[29.924,35.055],[30.123,35.145],[30.245,35.124],[30.361,35.163],[30.43,35.142],[31.133,35.444],[31.258,35.397],[31.423,35.459],[31.641,35.48],[31.766,35.559],[31.92,35.523],[31.937,35.545],[32.058,35.523],[32.237,35.574],[32.409,35.545],[32.492,35.581],[32.519,35.552],[32.56,35.581],[32.641,35.559],[32.744,35.757]]],"eg":[[[31.212,34.249],[30.652,34.479],[30.483,34.537],[30.41,34.526],[30.344,34.598],[30.013,34.735],[29.49,34.886],[29.311,34.735],[29.186,34.724],[29.107,34.674],[29.0,34.688],[28.968,34.645],[28.863,34.649],[28.847,34.62],[28.747,34.627],[28.308,34.407],[28.18,34.454],[28.082,34.425],[27.975,34.436],[27.914,34.332],[27.801,34.26],[27.791,34.213],[27.769,34.256],[27.729,34.256],[27.786,34.191],[27.815,34.055],[28.024,33.763],[28.298,33.565],[28.367,33.435],[28.544,33.255],[28.576,33.263],[28.566,33.237],[28.551,33.255],[28.57,33.23],[28.674,33.194],[28.764,33.227],[28.818,33.18],[29.004,33.173],[29.243,32.885],[29.36,32.816],[29.414,32.816],[29.483,32.733],[29.456,32.715],[29.539,32.723],[29.6,32.679],[29.723,32.694],[29.824,32.604],[29.875,32.625],[29.929,32.571],[30.012,32.579],[29.942,32.571],[29.961,32.514],[29.915,32.467],[29.866,32.51],[29.735,32.391],[29.593,32.337],[29.35,32.593],[29.09,32.661],[29.047,32.625],[28.973,32.625],[28.804,32.748],[28.779,32.805],[28.58,32.87],[28.49,33.003],[28.142,33.248],[28.085,33.338],[28.056,33.335],[28.016,33.443],[27.896,33.554],[27.791,33.594],[27.845,33.489],[27.816,33.475],[27.752,33.522],[27.759,33.558],[27.708,33.536],[27.646,33.594],[27.681,33.558],[27.646,33.497],[27.572,33.565],[27.536,33.558],[27.496,33.633],[27.342,33.691],[27.242,33.839],[27.121,33.839],[26.896,33.997],[26.837,33.997],[26.83,33.947],[26.653,33.943],[26.611,34.015],[26.001,34.339],[25.724,34.548],[25.429,34.681],[24.905,34.991],[24.816,35.001],[24.764,35.063],[24.574,35.16],[24.5,35.145],[24.306,35.372],[24.108,35.495],[24.14,35.505],[24.076,35.588],[24.019,35.606],[23.983,35.739],[23.902,35.793],[23.933,35.75],[23.911,35.685],[23.929,35.599],[23.977,35.513],[23.918,35.484],[23.798,35.477],[23.757,35.509],[23.497,35.491],[23.394,35.549],[23.212,35.574],[23.073,35.653],[22.967,35.675],[22.884,35.736],[22.871,35.765],[22.931,35.725],[22.923,35.757],[22.833,35.786],[22.736,35.887],[22.636,36.225],[22.568,36.29],[22.492,36.312],[22.427,36.427],[22.356,36.441],[22.16,36.733],[22.165,36.783],[22.067,36.895],[22.018,36.899],[21.996,36.884],[21.996,31.434],[22.173,31.491],[22.227,31.423],[22.188,31.358],[21.994,31.25],[21.994,30.336],[21.996,24.982],[29.181,24.982],[29.503,24.864],[29.638,24.871],[29.797,24.799],[29.89,24.813],[30.143,24.687],[30.317,24.763],[30.498,24.907],[30.751,24.99],[31.038,24.882],[31.381,24.86],[31.494,25.022],[31.614,25.087],[31.656,25.152],[31.531,25.191],[31.506,25.303],[31.503,25.404],[31.614,25.825],[31.616,25.965],[31.437,26.865],[31.45,26.966],[31.368,27.225],[31.379,27.326],[31.268,27.384],[31.224,27.445],[31.18,27.661],[31.241,27.852],[31.099,27.927],[31.06,28.32],[31.084,28.424],[30.957,28.813],[30.91,28.834],[30.827,29.029],[30.837,29.22],[30.957,29.504],[31.148,29.781],[31.155,29.839],[31.19,29.886],[31.207,29.868],[31.334,30.069],[31.285,30.095],[31.271,30.174],[31.238,30.141],[31.217,30.167],[31.265,30.267],[31.238,30.289],[31.278,30.289],[31.278,30.181],[31.351,30.314],[31.422,30.35],[31.498,30.343],[31.444,30.397],[31.509,30.361],[31.462,30.458],[31.464,30.537],[31.587,30.973],[31.422,30.559],[31.395,30.541],[31.39,30.563],[31.422,30.674],[31.388,30.735],[31.447,30.8],[31.42,30.894],[31.457,30.941],[31.437,30.98],[31.52,31.034],[31.493,31.121],[31.516,31.131],[31.565,31.07],[31.584,30.977],[31.607,31.099],[31.444,31.556],[31.536,31.873],[31.521,31.945],[31.4,32.024],[31.295,32.201],[31.395,31.995],[31.437,31.967],[31.438,31.992],[31.531,31.891],[31.498,31.844],[31.428,31.88],[31.466,31.837],[31.444,31.823],[31.417,31.88],[31.408,31.83],[31.368,31.826],[31.354,31.859],[31.359,31.797],[31.285,31.769],[31.224,31.887],[31.251,31.905],[31.217,31.891],[31.187,31.927],[31.231,31.988],[31.217,32.039],[31.128,32.017],[31.141,32.049],[31.108,32.071],[31.087,32.046],[31.053,32.107],[31.065,32.132],[31.094,32.1],[31.079,32.147],[31.124,32.183],[31.104,32.233],[31.136,32.283],[31.17,32.262],[31.17,32.291],[31.265,32.283],[31.295,32.208],[31.271,32.33],[31.06,32.6],[31.081,32.762],[31.155,32.928],[31.052,32.665],[31.038,32.701],[31.101,32.892],[31.082,32.917],[31.113,32.928],[31.065,32.96],[31.057,33.011],[31.135,33.065],[31.097,33.018],[31.108,32.953],[31.197,33.108],[31.118,33.158],[31.108,33.119],[31.045,33.133],[31.06,33.223],[31.074,33.194],[31.101,33.263],[31.079,33.306],[31.101,33.317],[31.108,33.277],[31.114,33.385],[31.155,33.407],[31.114,33.594],[31.163,33.853],[31.314,34.199],[31.212,34.249]]],"iq":[[[37.109,42.36],[37.372,42.774],[37.227,43.677],[37.302,44.113],[36.978,44.282],[37.175,44.606],[37.165,44.732],[36.799,44.88],[36.698,45.02],[36.472,45.053],[36.356,45.24],[36.016,45.362],[35.821,45.776],[35.773,46.273],[35.608,45.996],[35.478,45.974],[35.321,46.111],[35.127,46.133],[34.799,45.679],[34.573,45.636],[34.582,45.499],[34.415,45.438],[34.216,45.542],[33.971,45.398],[33.603,45.737],[33.61,45.881],[33.492,45.873],[33.415,46.021],[33.229,46.147],[32.957,46.111],[32.929,46.377],[32.467,47.123],[32.455,47.331],[32.151,47.511],[31.794,47.828],[31.4,47.681],[31.002,47.681],[30.99,48.012],[30.466,48.015],[30.285,48.332],[30.037,48.433],[29.962,48.545],[30.044,48.073],[29.983,47.979],[30.096,47.673],[30.042,47.223],[29.259,46.694],[29.096,46.532],[29.063,46.356],[29.202,44.689],[31.08,42.075],[31.94,40.369],[32.125,39.145],[32.243,39.293],[32.351,39.246],[32.306,39.041],[32.473,38.983],[32.493,39.059],[33.372,38.774],[34.429,40.988],[34.769,41.193],[35.288,41.215],[35.641,41.355],[36.073,41.244],[36.384,41.294],[36.514,41.417],[36.597,41.787],[37.109,42.36]]],"sa":[[[25.383,36.902],[25.601,36.531],[25.688,36.535],[25.414,36.956],[25.383,36.902]],[[16.715,41.989],[16.71,42.065],[16.803,42.061],[16.708,42.169],[16.571,42.158],[16.671,42.072],[16.684,41.899],[16.847,41.777],[16.894,41.859],[17.003,41.859],[16.937,41.949],[16.715,41.989]],[[18.996,51.979],[18.581,49.041],[18.157,48.174],[17.449,47.58],[17.112,47.443],[16.947,47.144],[16.953,46.975],[17.265,46.727],[17.302,45.535],[17.427,45.146],[17.399,44.156],[17.324,43.919],[17.517,43.418],[17.359,43.191],[17.267,43.238],[17.204,43.155],[16.942,43.116],[16.689,43.166],[16.371,42.799],[16.737,42.698],[17.123,42.385],[17.435,42.295],[17.885,41.751],[18.678,41.229],[19.083,41.118],[19.755,40.758],[20.267,40.081],[20.39,39.728],[20.973,39.275],[21.31,39.095],[21.518,39.149],[21.881,38.987],[22.393,39.095],[22.593,39.062],[23.713,38.465],[24.185,37.921],[24.291,37.543],[24.82,37.179],[24.961,37.266],[25.291,37.151],[25.641,36.92],[25.751,36.762],[26.039,36.675],[26.105,36.517],[26.594,36.251],[28.035,35.181],[28.131,34.721],[28.065,34.623],[29.353,34.951],[29.2,36.067],[29.495,36.477],[29.867,36.755],[29.995,37.471],[30.313,37.633],[30.5,37.979],[31.007,37.478],[31.492,36.96],[31.995,38.961],[32.125,39.145],[31.94,40.369],[31.08,42.075],[29.202,44.689],[28.99,47.432],[28.534,47.67],[28.542,48.444],[27.896,48.807],[27.725,48.797],[27.492,49.236],[27.438,49.175],[27.181,49.405],[27.152,49.538],[26.662,50.15],[26.678,50.01],[26.527,50.028],[26.308,50.215],[26.1,50.154],[26.11,50.032],[25.622,50.24],[25.424,50.456],[25.086,50.557],[24.595,50.928],[24.57,51.41],[24.341,51.31],[24.286,51.569],[24.079,51.594],[22.933,52.555],[22.621,55.104],[22.704,55.187],[22.001,55.64],[19.996,54.978],[18.996,51.979]]],"ye":[[[16.649,53.084],[16.47,52.58],[16.293,52.328],[15.956,52.174],[15.656,52.217],[15.336,51.605],[14.639,49.351],[14.456,49.049],[14.05,48.667],[13.998,48.278],[14.048,47.99],[13.661,47.407],[13.465,46.788],[13.338,45.657],[13.068,45.395],[12.998,45.164],[12.816,45.038],[12.764,44.754],[12.818,44.617],[12.67,44.358],[12.607,44.005],[12.745,43.634],[12.699,43.487],[13.267,43.231],[13.692,43.281],[14.01,43.091],[14.939,42.936],[15.133,42.857],[15.232,42.659],[15.326,42.698],[15.265,42.788],[15.326,42.799],[15.654,42.716],[16.033,42.839],[16.371,42.799],[16.77,43.188],[16.942,43.116],[17.204,43.155],[17.267,43.238],[17.359,43.191],[17.517,43.418],[17.324,43.919],[17.399,44.156],[17.427,45.146],[17.302,45.535],[17.265,46.727],[16.953,46.975],[16.947,47.144],[17.112,47.443],[17.449,47.58],[18.157,48.174],[18.581,49.041],[18.996,51.979],[16.649,53.084]],[[12.637,53.765],[12.665,54.186],[12.552,54.51],[12.361,54.128],[12.319,53.718],[12.533,53.315],[12.715,53.534],[12.637,53.765]]],"om":[[[20.218,58.722],[20.211,58.639],[20.338,58.643],[20.68,58.884],[20.517,58.952],[20.218,58.722]],[[16.649,53.084],[18.996,51.979],[19.996,54.978],[22.001,55.64],[22.704,55.187],[23.034,55.201],[23.725,55.507],[23.942,55.468],[24.063,55.986],[24.214,55.928],[24.242,55.759],[24.869,55.795],[24.97,55.964],[24.739,56.065],[24.98,56.389],[24.47,56.641],[23.923,57.221],[23.624,58.326],[23.643,58.578],[23.517,58.772],[22.661,59.431],[22.51,59.824],[22.22,59.798],[21.499,59.37],[21.112,58.895],[20.407,58.474],[20.425,58.211],[20.6,58.247],[20.59,58.171],[20.244,57.862],[19.678,57.714],[19.017,57.811],[18.902,57.178],[18.753,56.825],[18.588,56.656],[18.166,56.551],[17.987,56.382],[17.843,55.478],[17.586,55.255],[17.321,55.277],[17.04,55.064],[16.965,54.773],[17.031,54.568],[17.005,54.067],[16.76,53.61],[16.649,53.084]],[[25.65,56.299],[25.69,56.144],[26.048,56.166],[26.063,56.08],[26.23,56.198],[26.327,56.429],[25.65,56.299]]],"ae":[[[25.65,56.299],[25.57,56.364],[24.98,56.389],[24.739,56.065],[24.858,55.972],[24.954,56.0],[24.869,55.795],[24.242,55.759],[24.214,55.928],[24.063,55.986],[23.942,55.468],[23.819,55.532],[23.034,55.201],[22.704,55.187],[22.624,55.118],[22.911,52.742],[22.933,52.555],[24.079,51.594],[24.338,51.605],[24.254,51.767],[24.076,51.792],[23.985,51.907],[23.996,52.249],[24.155,52.649],[24.077,53.894],[24.279,54.398],[24.716,54.658],[25.794,55.943],[26.063,56.08],[26.048,56.166],[25.69,56.144],[25.65,56.299]],[[24.258,53.333],[24.291,53.192],[24.411,53.412],[24.258,53.333]]],"qa":[[[24.607,51.266],[24.574,50.968],[24.789,50.806],[25.445,50.762],[26.081,51.108],[26.154,51.263],[25.902,51.544],[25.78,51.572],[25.525,51.486],[24.964,51.587],[24.668,51.428],[24.607,51.266]]],"bh":[[[25.883,50.608],[25.806,50.575],[25.966,50.467],[26.228,50.471],[26.24,50.586],[25.883,50.608]]],"kw":[[[29.624,48.275],[29.665,48.141],[29.799,48.08],[29.896,48.138],[29.98,48.185],[29.784,48.347],[29.624,48.275]],[[28.542,48.444],[28.534,47.67],[28.99,47.432],[29.096,46.532],[29.537,46.907],[30.001,47.148],[30.096,47.673],[29.983,47.979],[29.572,48.145],[29.617,47.969],[29.393,47.724],[29.355,48.051],[28.542,48.444]]],"ir":[[[26.921,56.188],[26.7,55.954],[26.732,55.849],[26.582,55.424],[26.657,55.295],[26.811,55.763],[26.947,55.759],[26.91,55.907],[27.002,56.213],[26.952,56.281],[26.921,56.188]],[[37.344,53.916],[37.332,54.193],[37.471,54.701],[37.778,54.899],[38.05,55.381],[38.08,56.27],[38.25,56.44],[38.217,57.192],[37.974,57.354],[37.83,57.98],[37.665,58.261],[37.684,58.816],[37.51,59.302],[37.254,59.456],[37.042,59.95],[36.637,60.342],[36.642,61.12],[36.191,61.213],[35.978,61.152],[35.868,61.253],[35.514,61.278],[35.273,61.102],[35.094,61.148],[34.856,61.08],[34.653,60.95],[34.518,60.727],[34.32,60.889],[34.308,60.644],[34.094,60.486],[33.639,60.511],[33.505,60.918],[33.059,60.562],[32.249,60.828],[31.495,60.821],[31.382,61.66],[31.285,61.757],[30.914,61.811],[29.858,60.842],[29.372,61.318],[28.792,61.624],[28.546,61.89],[28.416,62.354],[28.235,62.563],[28.244,62.758],[27.497,62.812],[27.251,62.761],[27.252,63.168],[27.152,63.301],[26.666,63.168],[26.561,62.441],[26.357,62.239],[26.226,61.843],[25.843,61.753],[25.751,61.663],[25.202,61.588],[25.102,61.411],[25.282,60.662],[25.437,60.511],[25.312,60.4],[25.482,59.456],[25.417,59.046],[25.555,58.798],[25.591,58.204],[25.692,57.937],[25.654,57.797],[25.791,57.336],[26.372,57.106],[26.801,57.037],[27.089,56.814],[27.2,56.357],[27.143,56.119],[26.506,54.758],[26.697,54.247],[26.726,53.707],[26.943,53.455],[27.324,52.692],[27.617,52.476],[27.824,52.03],[27.91,51.518],[28.131,51.277],[28.726,51.061],[28.928,50.842],[29.063,50.878],[29.146,50.676],[29.421,50.651],[29.921,50.168],[30.198,50.071],[30.028,49.556],[30.334,49.027],[30.398,49.049],[30.412,49.247],[30.473,49.225],[30.506,49.002],[30.45,49.038],[30.327,48.89],[30.063,48.869],[29.962,48.545],[30.037,48.433],[30.285,48.332],[30.466,48.015],[30.99,48.012],[31.002,47.681],[31.4,47.681],[31.794,47.828],[32.424,47.371],[32.467,47.123],[32.929,46.377],[32.957,46.111],[33.229,46.147],[33.415,46.021],[33.492,45.873],[33.61,45.881],[33.603,45.737],[33.971,45.398],[34.216,45.542],[34.415,45.438],[34.582,45.499],[34.573,45.636],[34.799,45.679],[35.127,46.133],[35.321,46.111],[35.478,45.974],[35.608,45.996],[35.773,46.273],[35.821,45.776],[36.016,45.362],[36.356,45.24],[36.472,45.053],[36.698,45.02],[36.799,44.88],[37.135,44.765],[37.29,44.793],[37.436,44.574],[37.71,44.588],[37.908,44.21],[38.335,44.451],[38.387,44.3],[38.837,44.271],[38.934,44.171],[39.144,44.178],[39.377,44.023],[39.422,44.39],[39.667,44.455],[39.769,44.588],[39.651,44.819],[39.255,45.143],[39.007,45.481],[38.87,46.169],[38.904,46.554],[39.498,47.475],[39.684,47.997],[39.399,48.321],[39.241,48.105],[39.019,48.293],[38.854,47.997],[38.411,48.591],[38.436,48.869],[37.891,48.959],[37.668,49.081],[37.519,49.373],[37.406,50.129],[37.014,50.532],[36.743,51.119],[36.615,51.763],[36.622,52.192],[36.931,53.768],[36.931,53.916],[36.853,53.678],[36.818,53.97],[36.901,54.024],[37.344,53.916]]],"tr":[[[41.517,41.51],[41.432,41.823],[41.496,41.924],[41.439,42.468],[41.58,42.608],[41.564,42.788],[41.199,43.206],[41.156,43.433],[40.929,43.631],[40.72,43.724],[40.482,43.569],[40.167,43.71],[40.127,43.667],[40.022,43.94],[39.996,44.401],[39.651,44.819],[39.769,44.588],[39.667,44.455],[39.422,44.39],[39.377,44.023],[39.144,44.178],[38.934,44.171],[38.837,44.271],[38.387,44.3],[38.335,44.451],[37.908,44.21],[37.71,44.588],[37.436,44.574],[37.29,44.793],[37.142,44.765],[37.175,44.606],[36.978,44.282],[37.302,44.113],[37.227,43.677],[37.372,42.774],[37.129,42.457],[37.109,42.36],[37.297,42.201],[37.089,41.514],[37.097,40.707],[36.826,40.016],[36.682,39.357],[36.693,38.767],[36.901,38.191],[36.642,37.435],[36.653,37.068],[36.759,36.942],[36.802,36.657],[36.457,36.539],[36.234,36.636],[36.172,36.377],[36.004,36.348],[35.833,36.153],[35.917,35.894],[35.998,35.955],[36.309,35.811],[36.66,36.189],[36.807,36.179],[36.91,36.049],[36.575,35.394],[36.816,34.703],[36.182,33.695],[36.037,32.795],[36.184,32.377],[36.535,32.021],[36.8,31.351],[36.849,30.951],[36.866,30.645],[36.797,30.581],[36.269,30.447],[36.307,30.231],[36.156,29.688],[36.325,29.223],[36.715,28.971],[36.675,28.816],[36.813,28.305],[36.634,28.021],[36.752,28.086],[36.712,27.456],[36.832,28.006],[37.03,28.244],[36.976,27.261],[37.127,27.301],[37.163,27.535],[37.248,27.52],[37.389,27.218],[37.658,27.067],[37.726,27.225],[37.979,27.232],[38.278,26.289],[38.368,26.415],[38.562,26.372],[38.641,26.44],[38.557,26.588],[38.335,26.674],[38.418,26.728],[38.373,26.862],[38.451,27.142],[38.481,26.908],[38.71,26.764],[38.887,27.013],[38.962,26.815],[39.116,26.854],[39.292,26.682],[39.55,26.898],[39.467,26.113],[39.521,26.095],[39.989,26.181],[40.024,26.314],[40.401,26.739],[40.456,27.283],[40.319,27.477],[40.328,27.729],[40.382,27.848],[40.481,27.733],[40.514,27.873],[40.489,27.988],[40.37,27.963],[40.39,29.007],[40.423,29.054],[40.535,28.788],[40.63,28.957],[40.738,29.846],[40.809,29.364],[40.937,29.115],[41.007,29.047],[41.22,29.148],[41.107,31.254],[41.319,31.459],[41.729,32.305],[42.017,33.381],[41.956,34.749],[42.064,35.005],[42.028,35.156],[41.89,35.124],[41.729,35.297],[41.633,35.559],[41.682,36.053],[41.427,36.179],[41.274,36.405],[41.363,36.776],[41.184,37.068],[40.925,38.382],[41.106,39.426],[40.982,39.807],[40.962,40.265],[41.262,41.082],[41.517,41.51]],[[41.969,28.014],[41.856,27.988],[41.555,28.197],[41.229,29.058],[41.009,28.957],[40.974,28.78],[41.081,28.172],[40.974,27.499],[40.687,27.258],[40.498,26.772],[40.075,26.203],[40.314,26.253],[40.627,26.793],[40.611,26.106],[40.727,26.037],[40.955,26.332],[41.239,26.332],[41.403,26.624],[41.6,26.581],[41.745,26.318],[41.826,26.512],[41.948,26.581],[42.094,27.243],[41.922,27.535],[41.969,28.014]]],"cy":[[[35.17,32.712],[35.087,32.921],[35.163,33.385],[35.0,33.475],[35.094,33.867],[35.045,34.022],[34.988,34.051],[34.971,33.936],[34.971,33.698],[34.75,33.414],[34.696,33.115],[34.577,32.942],[34.662,32.867],[34.729,32.449],[34.953,32.316],[35.084,32.301],[35.051,32.391],[35.17,32.712]]],"ncy":[[[35.064,34.004],[35.0,33.475],[35.141,33.425],[35.174,33.191],[35.089,32.87],[35.17,32.712],[35.181,32.881],[35.391,32.942],[35.354,33.608],[35.662,34.555],[35.292,33.943],[35.202,33.907],[35.064,34.004]]],"gr":[[[38.384,20.612],[38.089,20.781],[38.106,20.522],[38.234,20.454],[38.181,20.353],[38.337,20.41],[38.332,20.518],[38.476,20.562],[38.384,20.612]],[[37.806,20.889],[37.708,20.994],[37.665,20.817],[37.823,20.634],[37.929,20.691],[37.806,20.889]],[[38.609,20.688],[38.583,20.554],[38.76,20.594],[38.844,20.695],[38.609,20.688]],[[38.958,23.416],[38.814,23.524],[38.649,24.129],[38.22,24.277],[38.123,24.59],[37.97,24.504],[38.118,24.212],[38.391,24.039],[38.443,23.65],[38.552,23.618],[38.845,23.143],[38.847,22.88],[39.031,23.258],[38.958,23.416]],[[38.809,24.676],[38.788,24.54],[38.889,24.46],[38.981,24.486],[38.809,24.676]],[[40.614,24.774],[40.58,24.648],[40.647,24.514],[40.793,24.622],[40.731,24.774],[40.614,24.774]],[[36.189,23.053],[36.175,22.941],[36.368,22.934],[36.247,23.096],[36.189,23.053]],[[35.465,27.175],[35.41,27.139],[35.457,27.099],[35.597,27.07],[35.788,27.157],[35.821,27.222],[35.629,27.157],[35.479,27.232],[35.465,27.175]],[[36.728,26.948],[36.905,27.265],[36.868,27.351],[36.728,26.948]],[[36.967,25.548],[36.929,25.458],[37.071,25.36],[37.196,25.526],[37.153,25.587],[36.967,25.548]],[[37.811,26.826],[37.71,27.056],[37.656,26.79],[37.724,26.581],[37.811,26.826]],[[37.53,26.03],[37.635,26.088],[37.674,26.325],[37.53,26.03]],[[36.79,25.861],[36.79,25.742],[36.847,25.854],[36.903,26.066],[36.79,25.861]],[[37.76,24.993],[37.693,24.961],[37.899,24.716],[37.988,24.763],[37.905,24.957],[37.76,24.993]],[[37.599,25.256],[37.545,25.155],[37.677,24.997],[37.599,25.256]],[[38.219,26.095],[38.161,25.998],[38.269,25.875],[38.354,25.99],[38.575,25.846],[38.602,26.012],[38.54,26.16],[38.219,26.095]],[[39.33,26.412],[39.109,26.577],[39.031,26.584],[39.075,26.487],[38.995,26.548],[39.026,26.16],[39.082,26.109],[39.165,26.246],[39.194,26.178],[39.095,26.073],[39.139,25.908],[39.2,25.843],[39.288,25.911],[39.373,26.167],[39.33,26.412]],[[39.983,25.436],[39.809,25.357],[39.894,25.249],[39.826,25.126],[39.852,25.062],[40.0,25.058],[39.956,25.285],[40.035,25.45],[39.983,25.436]],[[35.929,27.844],[35.957,27.715],[36.172,27.715],[36.346,27.913],[36.434,28.233],[36.37,28.23],[36.066,28.089],[35.929,27.844]],[[35.535,23.852],[35.596,24.165],[35.537,24.198],[35.495,24.108],[35.469,24.255],[35.363,24.313],[35.426,24.72],[35.306,25.476],[35.349,25.731],[35.123,25.792],[35.309,26.286],[35.045,26.246],[35.019,26.167],[34.934,24.799],[35.089,24.709],[35.16,24.464],[35.257,23.593],[35.535,23.571],[35.514,23.672],[35.655,23.737],[35.535,23.852]],[[41.717,26.322],[41.6,26.581],[41.403,26.624],[41.239,26.332],[40.996,26.354],[40.75,26.109],[40.995,25.105],[40.857,24.792],[40.948,24.478],[40.724,24.082],[40.748,23.762],[40.418,23.866],[40.328,24.212],[40.147,24.342],[40.359,23.913],[40.33,23.73],[40.114,23.967],[39.965,23.946],[40.224,23.665],[40.264,23.427],[40.075,23.467],[39.958,23.676],[39.989,23.395],[40.217,23.312],[40.399,22.898],[40.491,22.851],[40.59,22.923],[40.496,22.628],[40.036,22.592],[39.175,23.326],[39.101,23.154],[39.259,23.161],[39.305,22.92],[39.259,22.84],[39.17,22.887],[39.031,22.966],[39.038,23.067],[38.868,22.57],[38.661,23.254],[38.352,23.683],[38.274,23.967],[37.71,24.054],[37.677,23.971],[38.035,23.503],[37.878,23.035],[37.795,23.146],[37.62,23.197],[37.58,23.395],[37.441,23.488],[37.333,23.161],[37.517,22.941],[37.542,22.725],[36.854,23.06],[36.644,23.042],[36.448,23.161],[36.793,22.718],[36.78,22.61],[36.446,22.491],[36.514,22.376],[36.701,22.376],[37.03,22.081],[36.99,21.955],[36.892,21.94],[36.738,21.894],[36.863,21.739],[37.082,21.584],[37.387,21.678],[37.854,21.138],[38.196,21.404],[38.175,21.66],[38.328,21.825],[38.321,21.955],[37.958,22.92],[38.05,22.894],[38.134,23.182],[38.439,22.423],[38.358,22.318],[38.413,21.966],[38.321,21.472],[38.488,21.332],[38.373,21.303],[38.345,21.184],[38.875,20.767],[38.941,20.893],[38.896,21.112],[39.029,21.12],[39.009,20.781],[39.326,20.302],[39.71,20.0],[39.679,20.248],[39.802,20.382],[39.979,20.31],[40.118,20.659],[40.446,20.806],[40.495,20.95],[40.623,21.03],[40.851,20.965],[40.87,21.577],[41.132,21.994],[41.118,22.495],[41.179,22.725],[41.331,22.783],[41.387,23.636],[41.528,24.057],[41.552,24.518],[41.356,24.774],[41.364,24.993],[41.243,25.252],[41.312,25.922],[41.436,26.156],[41.705,26.084],[41.717,26.322]]],"ly":[[[30.831,20],[30.964,20.112],[31.195,20.14],[31.477,20],[31.967,20],[32.219,20.122],[32.58,20.623],[32.943,21.721],[32.919,22.189],[32.618,23.089],[32.332,23.107],[32.214,23.287],[32.158,23.798],[32.009,24.129],[31.985,24.878],[31.884,25.026],[31.655,25.152],[31.335,24.853],[30.776,24.975],[30.202,24.702],[29.81,24.81],[29.181,24.979],[20.003,24.979],[19.996,23.982],[19.496,23.982],[21.462,20]]],"sd":[[[9.462,34.08],[9.507,33.871],[9.861,33.965],[10.182,33.907],[10.646,33.381],[10.746,33.129],[10.851,33.173],[11.606,33.072],[12.217,33.198],[12.224,32.723],[12.01,32.737],[12.007,32.071],[11.694,32.345],[11.314,32.337],[11.088,32.42],[10.663,31.934],[10.22,31.653],[9.771,31.153],[9.731,30.757],[10.278,30.005],[10.064,29.605],[9.922,29.605],[9.769,29.472],[9.594,28.978],[9.458,28.838],[9.326,28.845],[9.328,28.05],[9.602,27.88],[9.615,27.074],[9.484,26.66],[10.17,25.918],[10.42,25.8],[10.293,25.065],[10.056,25.004],[9.774,24.784],[9.528,24.781],[9.389,24.673],[8.887,24.532],[8.767,24.212],[8.665,24.147],[8.766,23.582],[9.115,23.467],[9.34,23.622],[9.823,23.647],[10.387,23.312],[10.92,22.858],[11.345,22.923],[11.58,22.592],[11.989,22.581],[12.068,22.473],[12.661,22.351],[12.679,21.93],[12.79,21.825],[13.113,21.991],[13.33,22.228],[13.85,22.128],[14.128,22.509],[14.238,22.498],[14.55,22.383],[14.722,22.671],[14.998,22.765],[15.163,22.934],[15.533,22.934],[15.626,23.01],[15.703,23.107],[15.722,23.971],[19.996,23.982],[20.003,24.979],[21.996,24.979],[21.994,31.211],[22.202,31.401],[22.149,31.488],[21.996,31.434],[21.998,36.87],[21.586,36.927],[21.109,37.259],[21.039,37.259],[21.103,37.151],[20.982,37.14],[20.557,37.226],[20.121,37.194],[19.583,37.248],[18.821,37.471],[18.005,38.609],[17.564,38.22],[17.324,37.547],[17.062,37.41],[17.059,37.01],[16.625,36.888],[16.296,36.913],[15.132,36.427],[14.257,36.524],[13.627,36.391],[13.094,36.161],[12.757,36.125],[12.623,35.671],[11.816,35.113],[10.865,34.933],[10.746,34.771],[10.88,34.573],[10.658,34.343],[10.528,34.274],[10.191,34.31],[9.462,34.08]]],"ss":[[[8,24.998],[8.137,24.853],[8.292,24.291],[8.665,24.147],[8.767,24.212],[8.887,24.532],[9.389,24.673],[9.528,24.781],[9.774,24.784],[10.312,25.105],[10.406,25.857],[10.17,25.918],[9.484,26.66],[9.615,27.074],[9.602,27.88],[9.328,28.05],[9.326,28.845],[9.458,28.838],[9.594,28.978],[9.769,29.472],[9.922,29.605],[10.064,29.605],[10.278,30.005],[9.731,30.757],[9.799,31.225],[10.384,31.794],[10.663,31.934],[11.088,32.42],[11.314,32.337],[11.694,32.345],[12.007,32.071],[12.01,32.737],[12.224,32.723],[12.217,33.198],[11.606,33.072],[10.851,33.173],[10.746,33.129],[10.646,33.381],[10.182,33.907],[9.861,33.965],[9.507,33.871],[9.462,34.08],[8.677,34.101],[8.443,33.954],[8.438,33.281],[8,33.052]]],"er":[[[14.257,36.524],[15.132,36.427],[16.296,36.913],[16.625,36.888],[17.059,37.01],[17.062,37.41],[17.324,37.547],[17.564,38.22],[18.005,38.609],[17.086,39.033],[15.922,39.3],[15.125,39.786],[15.47,39.865],[15.335,40.041],[15.014,40.203],[14.934,40.545],[14.743,40.801],[14.62,41.175],[13.982,41.658],[13.588,42.245],[13.397,42.345],[13.213,42.399],[13.222,42.522],[12.864,42.795],[12.809,42.968],[12.899,43.001],[12.824,43.083],[12.708,43.116],[12.623,42.867],[12.377,42.669],[12.514,42.479],[12.467,42.378],[14.111,40.819],[14.456,40.142],[14.536,39.53],[14.479,39.199],[14.628,39.023],[14.482,38.814],[14.429,38.432],[14.852,37.885],[14.149,37.572],[14.455,37.259],[14.272,37.025],[14.316,36.812],[14.257,36.524]],[[15.696,40.142],[15.644,40.182],[15.703,40.25],[15.58,40.398],[15.613,39.977],[15.696,39.948],[15.656,40.023],[15.744,39.941],[15.828,40.002],[15.89,39.955],[15.838,40.095],[15.696,40.142]]],"dj":[[[11.5,43.245],[11.0,42.921],[11.082,42.558],[10.941,41.957],[10.981,41.798],[11.686,41.791],[12.514,42.479],[12.38,42.705],[12.623,42.867],[12.708,43.116],[12.366,43.353],[12.092,43.379],[11.83,43.047],[11.739,42.799],[11.561,42.641],[11.573,42.522],[11.496,42.583],[11.588,43.044],[11.5,43.245]]],"et":[[[8,33.052],[8.438,33.281],[8.443,33.954],[8.582,34.094],[9.514,34.08],[10.191,34.31],[10.528,34.274],[10.88,34.573],[10.746,34.771],[10.865,34.933],[11.816,35.113],[12.623,35.671],[12.757,36.125],[13.094,36.161],[13.627,36.391],[14.257,36.524],[14.316,36.812],[14.272,37.025],[14.455,37.259],[14.149,37.572],[14.852,37.885],[14.429,38.432],[14.482,38.814],[14.628,39.023],[14.479,39.199],[14.536,39.53],[14.456,40.142],[14.111,40.819],[12.661,42.227],[12.467,42.378],[11.686,41.791],[10.981,41.798],[10.941,41.957],[11.082,42.558],[11.0,42.921],[10.601,42.655],[10.203,42.842],[9.88,43.181],[9.38,43.483],[8.986,44.023],[8,46.969]]],"so":[[[8,47.982],[9.451,48.937],[11.259,48.937],[11.529,50.111],[11.823,50.528],[11.984,50.791],[11.831,51.256],[11.335,51.083],[10.656,51.14],[10.444,51.032],[10.479,51.187],[10.554,51.194],[10.476,51.371],[10.387,51.385],[10.431,51.209],[10.335,50.932],[9.429,50.824],[8.2,50.104],[8,49.892]]],"sol":[[[11.259,48.937],[9.451,48.937],[8,47.982],[8,46.969],[8.986,44.023],[9.38,43.483],[9.88,43.181],[10.203,42.842],[10.621,42.659],[11.5,43.245],[10.785,43.854],[10.431,44.387],[10.437,44.945],[10.835,45.816],[10.746,46.565],[11.174,47.403],[11.139,48.019],[11.321,48.573],[11.259,48.937]]],"am":[[[39.703,44.768],[40.04,44.289],[40.022,43.94],[40.127,43.667],[40.167,43.71],[40.482,43.569],[40.72,43.724],[41.107,43.44],[41.212,44.84],[41.26,44.811],[41.291,45.002],[41.147,45.189],[41.076,45.071],[40.986,45.42],[40.847,45.589],[40.673,45.38],[40.533,45.456],[40.234,45.963],[40.024,45.884],[39.977,45.578],[39.594,46.201],[39.555,46.482],[39.403,46.367],[39.224,46.586],[39.193,46.399],[38.906,46.489],[38.878,46.115],[39.245,45.978],[39.378,45.765],[39.562,45.751],[39.495,45.456],[39.571,45.171],[39.766,45.031],[39.703,44.768]]],"az":[[[39.651,44.819],[39.703,44.768],[39.766,45.031],[39.571,45.171],[39.495,45.456],[39.562,45.751],[39.378,45.765],[39.245,45.978],[38.878,46.115],[38.972,45.575],[39.255,45.143],[39.651,44.819]],[[38.436,48.869],[38.411,48.591],[38.854,47.997],[39.019,48.293],[39.241,48.105],[39.399,48.321],[39.684,47.997],[39.498,47.475],[38.906,46.489],[39.193,46.399],[39.224,46.586],[39.403,46.367],[39.555,46.482],[39.594,46.201],[39.977,45.578],[40.024,45.884],[40.234,45.963],[40.417,45.571],[40.639,45.377],[40.847,45.589],[40.986,45.42],[41.076,45.071],[41.147,45.189],[41.291,45.002],[41.423,45.218],[41.338,45.715],[41.262,45.726],[41.187,45.92],[41.198,46.172],[41.088,46.536],[41.286,46.673],[41.658,46.183],[41.89,46.431],[41.8,46.572],[41.812,46.748],[41.515,47.144],[41.283,47.317],[41.199,47.792],[41.458,48.055],[41.602,48.39],[41.845,48.573],[41.786,48.663],[40.8,49.455],[40.583,49.776],[40.505,50.183],[40.279,50.366],[40.316,49.92],[40.194,49.553],[39.608,49.326],[39.349,49.362],[39.029,49.164],[39.134,49.013],[38.838,48.854],[38.436,48.869]]],"ge":[[[41.107,43.44],[41.236,43.152],[41.307,43.148],[41.58,42.756],[41.571,42.59],[41.439,42.468],[41.496,41.924],[41.432,41.823],[41.517,41.51],[41.705,41.701],[41.97,41.762],[42.659,41.489],[43.064,40.837],[43.146,40.463],[43.42,39.977],[43.569,40.149],[43.534,40.65],[43.218,41.582],[43.17,42.759],[42.746,43.782],[42.593,43.76],[42.595,44.005],[42.748,44.505],[42.616,44.772],[42.757,44.873],[42.675,45.161],[42.529,45.344],[42.498,45.704],[42.205,45.639],[41.89,46.431],[41.738,46.201],[41.625,46.19],[41.246,46.662],[41.071,46.457],[41.198,46.172],[41.224,45.794],[41.338,45.715],[41.449,45.279],[41.26,44.811],[41.212,44.84],[41.107,43.44]]],"tm":[[[41.323,55.979],[41.264,57.019],[41.35,57.12],[41.451,57.019],[41.857,56.965],[42.123,57.289],[42.189,57.815],[42.488,58.027],[42.3,58.474],[42.628,58.153],[42.663,58.477],[42.779,58.589],[42.562,58.877],[42.512,59.161],[42.323,59.356],[42.295,59.86],[42.212,59.986],[41.974,59.942],[41.804,60.202],[41.76,60.076],[41.594,60.137],[41.399,60.09],[41.222,60.454],[41.189,61.242],[41.276,61.498],[41.094,61.904],[40.684,62.095],[40.331,62.376],[39.976,62.484],[39.161,63.762],[38.953,64.162],[38.977,64.309],[38.238,65.612],[38.245,65.972],[38.234,66],[37.464,66],[37.569,65.764],[37.252,65.555],[37.238,65.09],[37.132,64.817],[36.34,64.511],[36.012,64.01],[35.846,63.128],[35.679,63.168],[35.446,63.056],[35.255,62.689],[35.17,62.308],[35.443,61.984],[35.458,61.544],[35.705,61.235],[36.642,61.12],[36.637,60.342],[37.042,59.95],[37.254,59.456],[37.51,59.302],[37.684,58.816],[37.665,58.261],[37.83,57.98],[37.974,57.354],[38.217,57.192],[38.25,56.44],[38.08,56.27],[38.05,55.381],[37.778,54.899],[37.471,54.701],[37.332,54.193],[37.344,53.916],[37.927,53.822],[38.95,53.869],[39.21,53.704],[39.34,53.336],[39.266,53.156],[39.432,53.124],[39.609,53.236],[39.547,53.603],[39.668,53.473],[39.91,53.488],[39.988,52.987],[39.896,52.951],[39.774,53.034],[40.054,52.804],[40.399,52.735],[41.038,52.944],[40.824,53.146],[40.819,53.614],[40.649,53.869],[40.693,54.377],[40.835,54.319],[40.873,54.686],[41.071,54.704],[41.519,54.096],[42.118,53.804],[42.094,53.164],[41.975,52.969],[41.712,52.814],[41.653,52.883],[41.199,52.85],[41.781,52.494],[42.147,53.056],[42.335,54.121],[41.965,54.856],[41.297,55.435],[41.323,55.979]]],"af":[[[29.79,66],[29.56,65.094],[29.544,64.392],[29.391,64.1],[29.499,63.568],[29.409,62.477],[29.858,60.842],[30.914,61.811],[31.285,61.757],[31.382,61.66],[31.495,60.821],[32.249,60.828],[33.059,60.562],[33.505,60.918],[33.639,60.511],[34.094,60.486],[34.308,60.644],[34.32,60.889],[34.518,60.727],[34.653,60.95],[34.856,61.08],[35.094,61.148],[35.273,61.102],[35.313,61.188],[35.62,61.264],[35.432,61.62],[35.443,61.984],[35.17,62.308],[35.255,62.689],[35.446,63.056],[35.679,63.168],[35.846,63.128],[36.012,64.01],[36.34,64.511],[37.132,64.817],[37.238,65.09],[37.252,65.555],[37.569,65.764],[37.464,66]]],"pk":[[[25.407,66],[25.308,64.777],[25.206,64.594],[25.404,64.061],[25.353,63.557],[25.211,63.492],[25.265,62.664],[25.134,62.315],[25.225,62.2],[25.131,61.908],[25.187,61.566],[25.751,61.663],[25.843,61.753],[26.226,61.843],[26.357,62.239],[26.561,62.441],[26.65,63.157],[27.152,63.301],[27.252,63.168],[27.251,62.761],[27.497,62.812],[28.244,62.758],[28.235,62.563],[28.416,62.354],[28.546,61.89],[28.792,61.624],[29.372,61.318],[29.858,60.842],[29.409,62.477],[29.499,63.568],[29.391,64.1],[29.544,64.392],[29.56,65.094],[29.803,66]]],"bg":[[[41.969,28.014],[41.922,27.535],[42.094,27.243],[41.965,26.617],[41.717,26.322],[41.725,26.106],[41.385,26.134],[41.312,25.922],[41.243,25.252],[41.364,24.993],[41.356,24.774],[41.555,24.489],[41.337,22.916],[41.739,23.002],[41.993,22.837],[42.314,22.344],[42.441,22.524],[42.543,22.473],[42.842,22.466],[42.883,22.707],[43.187,22.977],[43.455,22.556],[43.781,22.369],[44,22.418],[44,22.933],[43.948,22.869],[43.835,22.92],[43.875,23.226],[43.672,25.497],[44,26.203],[44,27.711],[43.987,27.884],[43.823,28.05],[43.772,28.222],[43.743,28.586],[43.501,28.561],[43.389,28.464],[43.396,28.132],[43.185,27.927],[42.75,27.888],[42.468,27.484],[42.35,27.708],[41.969,28.014]]],"uz":[[[38.234,66],[38.245,65.972],[38.238,65.612],[38.977,64.309],[38.953,64.162],[39.161,63.762],[39.976,62.484],[40.331,62.376],[40.684,62.095],[41.031,61.955],[41.163,61.8],[41.276,61.498],[41.189,61.242],[41.222,60.454],[41.399,60.09],[41.594,60.137],[41.76,60.076],[41.804,60.202],[41.974,59.942],[42.212,59.986],[42.295,59.86],[42.323,59.356],[42.512,59.161],[42.562,58.877],[42.779,58.589],[42.663,58.477],[42.628,58.153],[42.3,58.474],[42.488,58.027],[42.189,57.815],[42.123,57.289],[41.857,56.965],[41.451,57.019],[41.35,57.12],[41.264,57.019],[41.323,55.979],[44,55.976],[44,61.366],[43.493,61.991],[43.628,63.208],[43.552,64.442],[43.715,64.907],[43.31,65.497],[42.876,65.803],[42.952,66]]],"ru":[[[44,47.336],[43.555,47.461],[43.835,47.562],[43.885,47.648],[43.51,47.508],[43.034,47.465],[41.953,48.383],[41.845,48.573],[41.602,48.39],[41.458,48.055],[41.213,47.861],[41.283,47.317],[41.515,47.144],[41.812,46.748],[41.8,46.572],[41.87,46.539],[42.205,45.639],[42.498,45.704],[42.529,45.344],[42.675,45.161],[42.757,44.873],[42.616,44.772],[42.748,44.505],[42.571,43.825],[42.618,43.739],[42.746,43.782],[43.17,42.759],[43.218,41.582],[43.534,40.65],[43.569,40.149],[43.42,39.977],[44,39.134]]],"kz":[[[44,66.0],[42.952,66],[42.876,65.803],[43.31,65.497],[43.715,64.907],[43.552,64.442],[43.628,63.208],[43.493,61.991],[44,61.366],[44,55.976],[41.323,55.979],[41.297,55.435],[41.965,54.856],[42.335,54.121],[42.147,53.056],[41.781,52.494],[42.1,52.462],[42.429,52.62],[42.76,52.598],[42.869,51.9],[43.158,51.616],[43.173,51.295],[43.482,51.302],[43.75,51.065],[44,50.932]]],"td":[[[19.496,23.982],[15.722,23.971],[15.703,23.107],[15.533,22.934],[15.163,22.934],[14.998,22.765],[14.722,22.671],[14.55,22.383],[14.161,22.538],[13.8,22.106],[13.33,22.228],[13.113,21.991],[12.79,21.825],[12.679,21.93],[12.661,22.351],[12.547,22.416],[12.068,22.473],[11.989,22.581],[11.58,22.592],[11.345,22.923],[10.92,22.858],[10.996,22.495],[10.642,21.771],[10.238,21.634],[10.208,21.526],[9.969,21.354],[9.974,21.264],[9.406,20.774],[9.127,20.342],[9.095,20],[21.462,20],[19.496,23.982]]],"cf":[[[8.665,24.147],[8.292,24.291],[8.137,24.853],[8,24.998],[8,20.0],[9.095,20],[9.127,20.342],[9.406,20.774],[9.974,21.264],[9.969,21.354],[10.208,21.526],[10.238,21.634],[10.366,21.724],[10.609,21.732],[10.996,22.495],[10.92,22.858],[10.387,23.312],[9.823,23.647],[9.34,23.622],[9.115,23.467],[8.816,23.539],[8.665,24.147]]],"mk":[[[42.248,21.562],[42.35,22.279],[41.993,22.837],[41.717,23.006],[41.356,22.93],[41.312,22.754],[41.179,22.725],[41.132,21.994],[40.87,21.577],[40.906,20.742],[41.272,20.49],[41.521,20.45],[41.863,20.554],[41.873,20.724],[42.071,20.778],[42.172,21.058],[42.1,21.285],[42.22,21.39],[42.248,21.562]]],"al":[[[42.53,20],[42.547,20.065],[42.338,20.241],[42.224,20.486],[41.918,20.583],[41.521,20.45],[41.272,20.49],[40.929,20.709],[40.871,20.958],[40.623,21.03],[40.495,20.95],[40.446,20.806],[40.118,20.659],[39.979,20.31],[39.802,20.382],[39.679,20.248],[39.71,20.0],[39.71,20]]]};
+const REGION = Object.fromEntries(Object.entries(REGION_LL).map(([k, rings]) => [k, rings.map(poly)]));
+const GAZA = REGION.ps.find((r) => r.every((p) => p.x < -20));
+const WEST_BANK = REGION.ps.find((r) => r !== GAZA);
+const DEAD_SEA = poly([[31.76,35.50],[31.70,35.57],[31.45,35.58],[31.20,35.52],[31.05,35.42],[31.20,35.40],[31.46,35.39],[31.70,35.46]]);
+const KINNERET = { c: km(32.82, 35.59), rx: 5.5, ry: 10 };
+// near: shown only when zoomed in on Israel; far: shown only when zoomed out
+const LABELS = [
+  ['לבנון', 33.75, 35.85, 'near'], ['סוריה', 34.6, 38.3, ''], ['ירדן', 31.0, 36.6, ''], ['מצרים', 26.5, 30.5, ''],
+  ['עזה', 31.40, 34.05, 'near'], ['סיני', 30.0, 33.8, 'near'], ['הים התיכון', 33.2, 31.5, ''], ['ים סוף', 20.5, 38.6, 'far'],
+  ['עיראק', 33.0, 43.5, 'far'], ['סעודיה', 24.5, 44.5, 'far'], ['תימן', 15.8, 47.5, 'far'], ['איראן', 32.5, 54.0, 'far'],
+  ['טורקיה', 39.0, 35.0, 'far'], ['קפריסין', 35.1, 33.2, ''], ['המפרץ הפרסי', 27.3, 51.3, 'far'], ['עומאן', 20.5, 56.5, 'far'],
+  ['לוב', 27.5, 22.5, 'far'], ['סודן', 15.0, 30.5, 'far'], ['כווית', 29.3, 47.6, 'far'], ['האמירויות', 23.7, 54.2, 'far'], ['קטר', 25.3, 51.2, 'far']
+].map(([t, a, b, tier]) => ({ t, tier, ...km(a, b) }));
+
+// r = radius in km counted as built-up area; w = how bad a hit is for public trust
+const CITIES = [
+  ['תל אביב', 32.08, 34.78, 6, 8], ['ירושלים', 31.77, 35.21, 5, 8], ['חיפה', 32.80, 35.00, 4.5, 7],
+  ['באר שבע', 31.25, 34.79, 4, 6], ['אשדוד', 31.80, 34.65, 3.5, 5], ['אשקלון', 31.67, 34.57, 3, 5],
+  ['שדרות', 31.525, 34.597, 1.6, 4], ['נתיבות', 31.42, 34.59, 1.5, 4], ['אופקים', 31.31, 34.62, 1.5, 4],
+  ['קריית גת', 31.61, 34.77, 2, 4], ['רחובות', 31.89, 34.81, 2.5, 5], ['ראשון לציון', 31.96, 34.80, 3, 5],
+  ['פתח תקווה', 32.09, 34.88, 2.5, 5], ['נתניה', 32.32, 34.86, 3, 5], ['עפולה', 32.61, 35.29, 2, 4],
+  ['טבריה', 32.79, 35.53, 2, 4], ['צפת', 32.96, 35.50, 1.8, 4], ['כרמיאל', 32.92, 35.30, 2, 4],
+  ['נהריה', 33.01, 35.10, 2, 4], ['עכו', 32.93, 35.08, 1.8, 4], ['קריית שמונה', 33.21, 35.57, 1.8, 4],
+  ['מטולה', 33.28, 35.58, 0.8, 3], ['קצרין', 32.99, 35.69, 1.2, 3], ['דימונה', 31.07, 35.03, 1.5, 4],
+  ['אילת', 29.56, 34.95, 2.5, 5]
+].map(([name, a, b, r, w]) => ({ name, ...km(a, b), r, w, damage: [], alert: 0 }));
+const REBUILD = 3; // waves until a hit site is rebuilt
+const REBUILD_COST = 6; // $M per site for accelerated rebuilding (double in the big cities)
+const city = (n) => CITIES.find((c) => c.name === n);
+
+// ---------- foreign relations ----------
+// w = weight in the overall foreign-relations score; map = country outline on the map, if any
+const PARTNERS = {
+  us: { name: 'ארה״ב', w: 3, start: 75, note: 'משלוחי מיירטים לכיפה ולחץ' },
+  uk: { name: 'בריטניה', w: 1, start: 60, note: 'סיוע אירופי' },
+  fr: { name: 'צרפת', w: 1, start: 50, note: 'סיוע אירופי' },
+  de: { name: 'גרמניה', w: 1, start: 62, note: 'סיוע אירופי' },
+  ru: { name: 'רוסיה', w: 1, start: 35 },
+  cn: { name: 'סין', w: 1, start: 40 },
+  eg: { name: 'מצרים', w: 1, start: 50, map: 'eg', note: 'מתחת ל־10: עלולה להצטרף לירי' },
+  jo: { name: 'ירדן', w: 1, start: 45, map: 'jo', note: 'מתחת ל־10: עלולה להצטרף לירי' },
+  sa: { name: 'סעודיה', w: 1.2, start: 35, map: 'sa' },
+  ae: { name: 'האמירויות', w: 1, start: 60, map: 'ae' },
+  bh: { name: 'בחריין', w: .5, start: 55, map: 'bh' },
+  qa: { name: 'קטר', w: .7, start: 25, map: 'qa' },
+  tr: { name: 'טורקיה', w: 1, start: 25, map: 'tr' },
+  cy: { name: 'קפריסין', w: .5, start: 65, map: 'cy' },
+  gr: { name: 'יוון', w: .5, start: 65, map: 'gr' }
+};
+const ENEMY_MAP = { lb: 'lebanon', sy: 'syria', iq: 'iraq', ye: 'yemen', ir: 'iran' };
+
+// Diplomatic moves. Every partner has the general ones plus one of its own; each partner once per wave.
+// cost in $M; fx is applied with applyFx (relTo, rel, econ, det, trust, budget ...).
+const DIPLO_COMMON = [
+  { label: 'ביקור מדיני', hint: '+4', cost: 2, fx: (k) => ({ relTo: { [k]: 4 } }) },
+  { label: 'חבילת סיוע', hint: '+8', cost: 10, fx: (k) => ({ relTo: { [k]: 8 } }) },
+  { label: 'הסכם סחר', hint: '+5 · כלכלה +2', cost: 4, need: 30, fx: (k) => ({ relTo: { [k]: 5 }, econ: 2 }) }
+];
+const DIPLO_SPECIAL = {
+  us: { label: 'לובי בקונגרס', hint: '+6', cost: 5, fx: { relTo: { us: 6 } } },
+  uk: { label: 'שיתוף פעולה בסייבר', hint: '+7', cost: 3, fx: { relTo: { uk: 7 } } },
+  fr: { label: 'יוזמה משותפת ללבנון', hint: '+8 · הרתעה −2', cost: 3, fx: { relTo: { fr: 8 }, det: -2 } },
+  de: { label: 'הסכם מחקר ופיתוח', hint: '+7 · כלכלה +1', cost: 4, fx: { relTo: { de: 7 }, econ: 1 } },
+  ru: { label: 'תיאום בשמי סוריה', hint: '+8 · ארה״ב −2', cost: 0, fx: { relTo: { ru: 8, us: -2 } } },
+  cn: { label: 'פרויקט תשתיות סיני', hint: '+9 · כלכלה +2 · ארה״ב −4', cost: 0, fx: { relTo: { cn: 9, us: -4 }, econ: 2 } },
+  eg: { label: 'הגדלת יצוא הגז למצרים', hint: '+9 · כלכלה +2', cost: 0, need: 20, fx: { relTo: { eg: 9 }, econ: 2 } },
+  jo: { label: 'הגדלת אספקת המים לירדן', hint: '+10', cost: 5, fx: { relTo: { jo: 10 } } },
+  sa: { label: 'קידום נורמליזציה', hint: '+10 · האמירויות +3 · טורקיה −3 · אמון −2', cost: 0, need: 45, fx: { relTo: { sa: 10, ae: 3, tr: -3 }, trust: -2 } },
+  ae: { label: 'קרן השקעות משותפת', hint: '+7 · כלכלה +3', cost: 5, fx: { relTo: { ae: 7 }, econ: 3 } },
+  bh: { label: 'מרכז אבטחה ימית משותף', hint: '+8', cost: 3, fx: { relTo: { bh: 8 } } },
+  qa: { label: 'ערוץ תיווך דרך דוחה', hint: '+9 · הרתעה −3', cost: 0, fx: { relTo: { qa: 9 }, det: -3 } },
+  tr: { label: 'חידוש קשרים כלכליים', hint: '+9 · קפריסין ויוון −3', cost: 0, fx: { relTo: { tr: 9, cy: -3, gr: -3 }, econ: 1 } },
+  cy: { label: 'צינור גז משותף', hint: '+8 · יוון +3 · טורקיה −3', cost: 6, fx: { relTo: { cy: 8, gr: 3, tr: -3 }, econ: 1 } },
+  gr: { label: 'תרגיל אווירי משותף', hint: '+8 · טורקיה −2', cost: 2, fx: { relTo: { gr: 8, tr: -2 } } }
+};
+// once per wave, for everyone at once
+const DIPLO_GLOBAL = { label: 'סיוע הומניטרי לאזרחי עזה', hint: 'אירופה +4-5 · מצרים, ירדן +5 · קטר, טורקיה +4 · סעודיה, האמירויות +3 · אמון −2 · הרתעה −3', cost: 8,
+  fx: { relTo: { fr: 5, uk: 4, de: 4, eg: 5, jo: 5, qa: 4, tr: 4, sa: 3, ae: 3, cn: 2 }, trust: -2, det: -3 } };
+
+// ---------- countries Israel fights ----------
+// state: a sovereign state with an air force and air defences; only these can shoot down Israeli aircraft.
+// stance: hostile ones fire anyway; neutral ones fire only after Israel strikes them.
+// air = air-defence strength (lowers strike success), far = needs long-range aircraft,
+// det = deterrence gained by a successful strike, react = how partners' relations move after a strike.
+// base fronts (gaza, lebanon) fire every wave; the others only while `active` waves remain.
+const COUNTRIES = {
+  gaza: { name: 'עזה', actor: 'חמאס', stance: 'hostile', air: 0.05, far: false, det: 5, aim: [31.45, 34.42],
+    origin() { const s = Math.random(); const a = km(31.53 - s * 0.24, 34.47 - s * 0.18); return { x: a.x + rnd(-1.5, 1.5), y: a.y + rnd(-1.5, 1.5) }; },
+    kinds: [['rocket', 1]],
+    targets: [['שדרות', 3], ['אשקלון', 3], ['נתיבות', 2], ['אופקים', 1], ['אשדוד', 2], ['קריית גת', 1], ['באר שבע', 1.5], ['רחובות', .6], ['ראשון לציון', .6], ['תל אביב', 1], ['פתח תקווה', .4], ['ירושלים', .4]],
+    react: { fr: -3, uk: -2, de: -2, eg: -4, jo: -5, qa: -6, tr: -6, sa: -2, ae: -1, cn: -2, ru: -2 } },
+  lebanon: { name: 'לבנון', actor: 'חיזבאללה', stance: 'hostile', air: 0.12, far: false, det: 8, aim: [33.85, 35.50],
+    origin() { return km(rnd(33.30, 33.42), rnd(35.22, 35.55)); },
+    kinds: [['rocket', 0.74], ['uav', 0.18], ['heavy', 0.08]],
+    targets: [['קריית שמונה', 3], ['מטולה', 1], ['נהריה', 2.5], ['צפת', 1.5], ['כרמיאל', 1.5], ['עכו', 1], ['חיפה', 1.6], ['טבריה', 1], ['קצרין', .8], ['עפולה', .5], ['נתניה', .3], ['תל אביב', .3]],
+    react: { fr: -7, uk: -2, de: -2, qa: -3, tr: -3, ru: -2, cn: -1, eg: -1, jo: -1 } },
+  syria: { name: 'סוריה', actor: 'צבא סוריה ומיליציות', state: true, stance: 'hostile', air: 0.2, far: false, det: 6, aim: [33.51, 36.29], fire: 6,
+    origin() { return km(rnd(32.8, 33.5), rnd(36.0, 36.4)); },
+    kinds: [['rocket', 0.7], ['heavy', 0.3]],
+    targets: [['קצרין', 3], ['טבריה', 2], ['צפת', 2], ['קריית שמונה', 1.5], ['עפולה', 1], ['חיפה', 1]],
+    react: { ru: -8, tr: -2, cn: -2, us: -1, jo: -1 } },
+  iraq: { name: 'עיראק', actor: 'מיליציות שיעיות', stance: 'hostile', air: 0.1, far: true, det: 6, aim: [33.3, 43.4], fire: 5,
+    origin() { return km(rnd(32.5, 34.5), rnd(41, 44)); },
+    kinds: [['uav', 0.7], ['heavy', 0.3]],
+    targets: [['חיפה', 1], ['תל אביב', 1], ['טבריה', 1], ['עפולה', 1], ['ירושלים', 1], ['באר שבע', .5], ['אילת', .7]],
+    react: { us: -4, uk: -2, fr: -2, de: -2, sa: -1, jo: -2, tr: -2, cn: -2, ru: -2 } },
+  yemen: { name: 'תימן', actor: 'החות׳ים', stance: 'hostile', air: 0.1, far: true, det: 6, aim: [15.35, 44.2], fire: 4,
+    origin() { return km(rnd(14.5, 16.5), rnd(43.2, 44.5)); },
+    kinds: [['ballistic', 0.5], ['uav', 0.5]],
+    targets: [['אילת', 3], ['תל אביב', 2], ['באר שבע', 1], ['אשדוד', 1], ['ירושלים', 1], ['דימונה', .5]],
+    react: { sa: 4, ae: 4, us: 2, uk: 1, fr: -1, de: -1, ru: -2, cn: -2, qa: -2 } },
+  iran: { name: 'איראן', actor: 'משמרות המהפכה', state: true, stance: 'hostile', air: 0.35, far: true, det: 20, aim: [35.7, 51.4], fire: 8,
+    origin() { return km(rnd(33.5, 38), rnd(45.5, 48.5)); },
+    kinds: [['ballistic', 0.85], ['heavy', 0.15]],
+    targets: [['תל אביב', 3], ['חיפה', 2], ['ירושלים', 1.5], ['באר שבע', 1.5], ['דימונה', 1], ['פתח תקווה', 1], ['רחובות', 1], ['אילת', .5]],
+    react: { us: -3, uk: -4, fr: -5, de: -5, ru: -8, cn: -8, qa: -6, tr: -4, sa: 2, ae: 1, bh: 1, eg: -2, jo: -2 } },
+  jordan: { name: 'ירדן', actor: 'צבא ירדן', state: true, stance: 'neutral', air: 0.2, far: false, det: 12, aim: [31.95, 35.93], fire: 8,
+    origin() { return km(rnd(31.6, 32.4), rnd(35.75, 35.98)); },
+    kinds: [['rocket', 1]],
+    targets: [['ירושלים', 2], ['עפולה', 1.5], ['טבריה', 1], ['באר שבע', 1], ['דימונה', 1], ['אילת', 1], ['נתניה', .5]],
+    react: { jo: -45, us: -15, uk: -12, fr: -12, de: -12, eg: -15, sa: -18, ae: -15, bh: -12, qa: -10, tr: -10, cy: -6, gr: -6, ru: -5, cn: -5 } },
+  egypt: { name: 'מצרים', actor: 'צבא מצרים', state: true, stance: 'neutral', air: 0.25, far: false, det: 15, aim: [30.6, 33.8], fire: 10,
+    origin() { return km(rnd(30.2, 30.9), rnd(33.9, 34.3)); },
+    kinds: [['rocket', 0.6], ['uav', 0.4]],
+    targets: [['באר שבע', 2], ['אופקים', 1.5], ['נתיבות', 1], ['דימונה', 1.5], ['אשקלון', 1], ['אילת', 2]],
+    react: { eg: -50, us: -15, uk: -10, fr: -12, de: -10, jo: -15, sa: -18, ae: -15, bh: -12, qa: -10, tr: -8, cy: -8, gr: -8, ru: -5, cn: -6 } }
+};
+const BASE_FRONTS = ['gaza', 'lebanon'];
+
+const AIRCRAFT = {
+  f35: { name: 'F-35I אדיר', note: 'חמקן, חודר הגנה אווירית', base: 0.94, airMul: 0.4, long: true, punch: 0.6, count: 3, home: [31.21, 35.01] },
+  f15: { name: 'F-15I רעם', note: 'טווח ארוך, חימוש כבד', base: 0.86, airMul: 1, long: true, punch: 0.5, count: 4, home: [31.23, 34.66] },
+  f16: { name: 'F-16I סופה', note: 'טווח קצר, זמין', base: 0.84, airMul: 1, long: false, punch: 0.65, count: 8, home: [32.66, 35.18] }
+};
+
+// ---------- targeted killings ----------
+// Senior figures by role. p = chance of success, det = deterrence on success.
+// after = multipliers on that front's fire for the coming waves: first the revenge, then the disarray.
+// react = reactions softened by legitimacy; host = reactions of the country where it happens (not softened).
+const LEADERS = [
+  { id: 'h_mil', org: 'gaza', title: 'ראש הזרוע הצבאית של חמאס', where: 'עזה', at: [31.42, 34.37], p: 0.45, det: 12, after: [1.5, 0.5, 0.6], react: { qa: -6, tr: -6, eg: -3, jo: -3 } },
+  { id: 'h_raf', org: 'gaza', title: 'מפקד חטיבת רפיח של חמאס', where: 'רפיח', at: [31.29, 34.25], p: 0.6, det: 5, after: [1.2, 0.7], react: { qa: -3, tr: -3 } },
+  { id: 'h_pol', org: 'gaza', title: 'ראש הלשכה המדינית של חמאס', where: 'דוחה, קטר', at: [25.29, 51.53], p: 0.55, det: 10, after: [1.3, 0.75], react: { tr: -8 }, host: { qa: -40, us: -12, eg: -8, sa: -4, ae: -4 } },
+  { id: 'hz_sg', org: 'lebanon', title: 'מזכ״ל חיזבאללה', where: 'הדאחייה, ביירות', at: [33.85, 35.50], p: 0.35, det: 18, after: [1.6, 0.4, 0.5, 0.7], react: { fr: -10, qa: -5, tr: -5, ru: -3 }, patron: 0.4 },
+  { id: 'hz_rad', org: 'lebanon', title: 'מפקד כוח רדואן', where: 'דרום לבנון', at: [33.27, 35.40], p: 0.55, det: 7, after: [1.2, 0.7, 0.8], react: { fr: -3 } },
+  { id: 'hz_msl', org: 'lebanon', title: 'מפקד מערך הטילים של חיזבאללה', where: 'בקעת הלבנון', at: [33.85, 36.00], p: 0.5, det: 8, after: [1.1, 0.5, 0.7], react: { fr: -3 } },
+  { id: 'ir_quds', org: 'iran', title: 'מפקד כוח קודס', where: 'דמשק, סוריה', at: [33.51, 36.29], p: 0.45, det: 15, after: [1], proxies: 0.75, react: { ru: -8, cn: -4, qa: -3 }, patron: 0.6 },
+  { id: 'ir_msl', org: 'iran', title: 'ראש תוכנית הטילים של משמרות המהפכה', where: 'טהרן', at: [35.70, 51.40], p: 0.3, det: 20, after: [1], react: { ru: -6, cn: -6, fr: -4, de: -4, qa: -4, tr: -4 }, patron: 1 },
+  { id: 'hu_lead', org: 'yemen', title: 'מנהיג החות׳ים', where: 'צעדה, תימן', at: [16.94, 43.76], p: 0.35, det: 12, after: [1.4, 0.4, 0.6], react: { ru: -2 }, host: { sa: 6, ae: 6 } },
+  { id: 'hu_cos', org: 'yemen', title: 'הרמטכ״ל של החות׳ים', where: 'צנעא', at: [15.35, 44.20], p: 0.5, det: 7, after: [1.2, 0.6], react: {}, host: { sa: 3, ae: 3 } },
+  { id: 'iq_mil', org: 'iraq', title: 'מפקד מיליציה פרו־איראנית', where: 'בגדד', at: [33.31, 44.36], p: 0.55, det: 6, after: [1.2, 0.5], react: {}, host: { us: -5 } }
+];
+const SUCCESSOR = 5; // waves until a killed figure is replaced
+
+// ---------- cooperation ----------
+// Countries that share a threat can work with Israel once relations are good enough.
+// intercept: they shoot down part of the fire from these fronts on its way to Israel.
+const COALITIONS = [
+  { id: 'jordan', name: 'הגנה אווירית משותפת עם ירדן', desc: 'ירדן מיירטת כטב״מים וטילי שיוט שחוצים את שמיה בדרך לישראל.',
+    need: { jo: 50 }, cost: { qa: -3, tr: -3 }, intercept: { fronts: ['iran', 'iraq', 'syria'], kinds: ['uav', 'heavy'], p: 0.45, by: 'ירדן' } },
+  { id: 'centcom', name: 'קואליציית פיקוד המרכז האמריקאי', desc: 'ספינות ומטוסים של ארה״ב, בריטניה וצרפת מיירטים טילים וכטב״מים מאיראן, עיראק ותימן.',
+    need: { us: 60, uk: 50 }, cost: { ru: -6, cn: -6 }, intercept: { fronts: ['iran', 'iraq', 'yemen'], kinds: ['ballistic', 'uav', 'heavy'], p: 0.3, by: 'כוחות ארה״ב' } },
+  { id: 'gulf', name: 'ברית מפרץ נגד החות׳ים', desc: 'סעודיה והאמירויות מיירטות טילים וכטב״מים מתימן מעל ים סוף.',
+    need: { sa: 45, ae: 55 }, cost: { qa: -5, tr: -4 }, intercept: { fronts: ['yemen'], kinds: ['ballistic', 'uav', 'heavy'], p: 0.4, by: 'סעודיה' } },
+  { id: 'egypt', name: 'שיתוף מודיעין עם מצרים', desc: 'מצרים מגבירה את המאבק בהברחות לעזה, ומלאי הרקטות של חמאס מתדלדל: 20% פחות ירי מעזה.',
+    need: { eg: 50 }, cost: { qa: -4, tr: -4 } },
+  { id: 'hellenic', name: 'ברית עם יוון וקפריסין', desc: 'שטחי אימונים ותחזוקה משותפת: אחרי כל גל חוזר לשירות מטוס אחד שאבד.',
+    need: { gr: 55, cy: 55 }, cost: { tr: -8 } }
+];
+
+// ---------- defence ----------
+const BATTERY_SITES = {
+  sderot: ['עוטף עזה', 31.47, 34.70], ashdod: ['אשדוד', 31.77, 34.71], dan: ['גוש דן', 32.02, 34.93],
+  haifa: ['חיפה', 32.76, 35.06], galil: ['גליל עליון', 33.09, 35.38], eilat: ['אילת', 29.63, 34.99],
+  jlm: ['ירושלים', 31.80, 35.12], bs: ['באר שבע', 31.27, 34.86], ks: ['קריית שמונה', 33.17, 35.52],
+  sharon: ['השרון', 32.25, 34.93], dimona: ['דימונה', 31.10, 35.09], golan: ['רמת הגולן', 32.98, 35.74],
+  arrow4: ['חץ ירושלים', 31.74, 35.08, 'arrow'], sling4: ['קלע דוד גליל', 32.98, 35.42, 'sling'],
+  arrow: ['חץ מרכז', 31.88, 35.00, 'arrow'], arrow2: ['חץ נגב', 30.95, 34.90, 'arrow'], arrow3: ['חץ צפון', 32.45, 35.05, 'arrow'],
+  sling: ['קלע דוד צפון', 32.68, 35.22, 'sling'], sling2: ['קלע דוד מרכז', 31.70, 34.98, 'sling'], sling3: ['קלע דוד דרום', 30.60, 34.80, 'sling']
+};
+// What each system can shoot down, and how likely a single interceptor is to kill it.
+// dome = Iron Dome, sling = David's Sling (heavy rockets, cruise missiles, some ballistic), arrow = Arrow (ballistic)
+const SYSTEMS = {
+  dome: { range: 40, mag: 8, reload: 4, v: 5, cost: 50, stock: 'reserve', pk: { rocket: 0.9, uav: 0.88 } },
+  sling: { range: 200, mag: 6, reload: 6, v: 10, cost: 1000, stock: 'stunners', pk: { heavy: 0.9, ballistic: 0.65, uav: 0.85 } },
+  arrow: { range: 420, mag: 6, reload: 8, v: 22, cost: 3000, stock: 'arrows', pk: { ballistic: 0.92 } },
+  // Iron Beam: a laser. Short range, one target at a time, but every shot is practically free.
+  laser: { range: 10, mag: 1, reload: 2.5, v: 300, cost: 0, stock: null, pk: { rocket: 0.85, uav: 0.9 } }
+};
+const canEngage = (b, th) => th.kind in b.pk;
+// procurement prices, $M
+const SHOP = {
+  dome: { name: 'כיפת ברזל', pack: 10, packCost: 1, battery: 40, what: 'רקטות וכטב״מים' },
+  sling: { name: 'קלע דוד', pack: 4, packCost: 4, battery: 90, what: 'טילים כבדים, שיוט, כטב״מים וגם בליסטיים' },
+  arrow: { name: 'חץ', pack: 2, packCost: 6, battery: 150, what: 'טילים בליסטיים' },
+  laser: { name: 'קרן אור (אור איתן)', battery: 220, fromWave: 5, anywhere: true, what: 'לייזר ליירוט רקטות וכטב״מים בטווח קצר (10 ק״מ). אין צורך במיירטים: כל ירי כמעט בחינם, ירי אחד בכל פעם' }
+};
+const SYS_RGB = { dome: '79, 209, 232', sling: '253, 186, 116', arrow: '196, 181, 253', laser: '134, 239, 172' };
+const KIND_NAME = { rocket: 'רקטה', uav: 'כטב״ם', heavy: 'טיל כבד/שיוט', ballistic: 'טיל בליסטי' };
+
+// ---------- helpers ----------
+const rnd = (a, b) => a + Math.random() * (b - a);
+const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); };
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const pick = (list) => { const tot = list.reduce((s, x) => s + x[1], 0); let r = Math.random() * tot; for (const x of list) { if ((r -= x[1]) < 0) return x[0]; } return list[0][0]; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const $ = (id) => document.getElementById(id);
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const signed = (v) => (v > 0 ? '+' : '−') + Math.abs(v);
+
+// ---------- sound ----------
+// Everything is synthesised with Web Audio, so the game needs no sound files.
+const settings = Object.assign({ volume: 0.8, siren: true, voice: true, sfx: true },
+  (() => { try { return JSON.parse(store.get('idSettings') || '{}'); } catch (e) { return {}; } })());
+const saveSettings = () => store.set('idSettings', JSON.stringify(settings));
+let audio = null, master = null, noise = null;
+function initAudio() {
+  if (audio) { if (audio.state === 'suspended') audio.resume(); return; }
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; return; }
+  master = audio.createGain(); master.gain.value = settings.volume; master.connect(audio.destination);
+  noise = audio.createBuffer(1, audio.sampleRate * 2, audio.sampleRate);
+  const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+// filtered noise burst: rockets, interceptors and explosions are all built from this
+function burst({ dur, vol, type = 'bandpass', f0, f1, q = 1, attack = 0.01 }) {
+  if (!audio || !settings.sfx) return;
+  const t = audio.currentTime, src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+  src.buffer = noise; src.loop = true;
+  f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(master); src.start(t); src.stop(t + dur + 0.05);
+}
+function thump(freq, dur, vol) {
+  if (!audio || !settings.sfx) return;
+  const t = audio.currentTime, o = audio.createOscillator(), g = audio.createGain();
+  o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq * 0.4, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(master); o.start(t); o.stop(t + dur);
+}
+const SFX = {
+  enemyLaunch: () => burst({ dur: 0.9, vol: 0.06, f0: 300, f1: 1100, q: 2, attack: 0.15 }),
+  interceptor: () => { burst({ dur: 1.1, vol: 0.28, f0: 700, f1: 3200, q: 1.2, attack: 0.02 }); thump(110, 0.25, 0.25); },
+  arrow: () => { burst({ dur: 1.8, vol: 0.32, f0: 300, f1: 2400, q: 0.8, attack: 0.05 }); thump(70, 0.6, 0.3); },
+  intercept: () => { burst({ dur: 1.4, vol: 0.4, type: 'lowpass', f0: 2500, f1: 150, attack: 0.005 }); thump(80, 0.5, 0.35); },
+  impact: () => { burst({ dur: 2.4, vol: 0.55, type: 'lowpass', f0: 900, f1: 60, attack: 0.005 }); thump(50, 1.2, 0.5); },
+  open: () => burst({ dur: 1.2, vol: 0.12, type: 'lowpass', f0: 600, f1: 80, attack: 0.01 }),
+  denied: () => thump(160, 0.15, 0.12),
+  laser: () => { if (!audio || !settings.sfx) return; const t = audio.currentTime, o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(2400, t); o.frequency.exponentialRampToValueAtTime(900, t + 0.5);
+    g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5); o.connect(g).connect(master); o.start(t); o.stop(t + 0.5); },
+  jet: () => burst({ dur: 2.6, vol: 0.25, f0: 200, f1: 1400, q: 0.6, attack: 0.8 })
+};
+
+// Rising and falling civil-defence siren; it sounds while any city has an alert.
+let siren = null, sirenOffAt = 0;
+function sirenUpdate(active) {
+  if (!audio) return;
+  const t = audio.currentTime;
+  if (active && settings.siren) {
+    sirenOffAt = t + 2;
+    if (siren) return;
+    const g = audio.createGain(), f = audio.createBiquadFilter(), lfo = audio.createOscillator(), depth = audio.createGain();
+    f.type = 'lowpass'; f.frequency.value = 2200;
+    lfo.frequency.value = 0.2; depth.gain.value = 190;
+    const oscs = [0, 4].map((det) => { const o = audio.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 540 + det; lfo.connect(depth); depth.connect(o.frequency); o.connect(f); o.start(t); return o; });
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.8);
+    f.connect(g).connect(master); lfo.start(t);
+    siren = { g, oscs, lfo };
+  } else if (siren && (t > sirenOffAt || !settings.siren)) {
+    const s = siren; siren = null;
+    s.g.gain.cancelScheduledValues(t); s.g.gain.setValueAtTime(s.g.gain.value, t); s.g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    [...s.oscs, s.lfo].forEach((o) => o.stop(t + 1.3));
+  }
+}
+
+// Spoken "צבע אדום" announcement, when the device has a Hebrew voice.
+let heVoice = null;
+function findVoice() { try { heVoice = speechSynthesis.getVoices().find((v) => /^he|^iw/i.test(v.lang)) || null; } catch (e) { heVoice = null; } updateVoiceNote(); }
+if ('speechSynthesis' in window) { findVoice(); speechSynthesis.onvoiceschanged = findVoice; }
+let lastVoice = 0;
+function announce(cityName) {
+  if (!settings.voice || !heVoice || G.speed > 1 || speechSynthesis.speaking || performance.now() - lastVoice < 3000) return;
+  lastVoice = performance.now();
+  const u = new SpeechSynthesisUtterance(`צבע אדום. צבע אדום. ${cityName}`);
+  u.voice = heVoice; u.lang = heVoice.lang; u.rate = 1.05; u.volume = settings.volume;
+  speechSynthesis.speak(u);
+}
+
+// ---------- state ----------
+let G;
+function newGame() {
+  G = {
+    t: 0, wave: 0, phase: 'intro', speed: 1, paused: false,
+    trust: 100, rel: 0, det: 30, budget: 120, econ: 80, spent: 0, reserve: 40, arrows: 14, stunners: 16, cost: 0, kills: 0, cityHits: 0, fired: 0, strikes: 0, lost: 0,
+    threats: [], ints: [], fx: [], queue: [], waveHits: 0, shelter: 1, usedCards: [], sorties: [],
+    p: Object.fromEntries(Object.entries(PARTNERS).map(([k, v]) => [k, v.start])),
+    fleet: Object.fromEntries(Object.entries(AIRCRAFT).map(([k, a]) => [k, a.count])),
+    c: Object.fromEntries(Object.keys(COUNTRIES).map((k) => [k, { active: 0, sup: 1, struck: 0, plan: [], now: 0, recent: 0 }])),
+    lead: {}, coal: {}, diplUsed: {}, diplOpen: null, killPick: null, alliedKills: 0, kills2: 0,
+    batteries: ['sderot', 'ashdod', 'dan', 'haifa', 'galil', 'eilat', 'arrow', 'arrow2', 'sling', 'sling2'].map(addBattery)
+  };
+  syncRel();
+  CITIES.forEach((c) => { c.damage = []; c.alert = 0; });
+}
+function addBattery(id) {
+  const [name, a, b, type = 'dome'] = BATTERY_SITES[id];
+  return makeBattery(id, type, name, km(a, b));
+}
+function makeBattery(id, type, name, pos) {
+  return { id, type, name, x: pos.x, y: pos.y, ...SYSTEMS[type], ammo: SYSTEMS[type].mag, reloadT: 0, flash: 0 };
+}
+function inPoly(p, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i], b = pts[j];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+// between waves: will this country fire in the coming wave? (Lebanon joins from wave 2, i.e. always by the first break)
+const firing = (id) => BASE_FRONTS.includes(id) || G.c[id].active > 0;
+
+// overall foreign relations = weighted average of every partner
+function syncRel() {
+  let s = 0, w = 0;
+  for (const [k, p] of Object.entries(PARTNERS)) { s += G.p[k] * p.w; w += p.w; }
+  G.rel = Math.round(s / w);
+  if (!$('dipl').hidden) renderDipl();
+}
+function relShift(changes, scale = 1) {
+  for (const [k, v] of Object.entries(changes)) G.p[k] = clamp(Math.round(G.p[k] + v * scale), 0, 100);
+  syncRel();
+}
+const relAll = (v) => relShift(Object.fromEntries(Object.keys(PARTNERS).map((k) => [k, v])));
+// Legitimacy: the more a front has fired at Israel lately (and the more it hit), the more the world
+// accepts Israel striking back there. At full legitimacy a strike costs nothing in foreign relations.
+const legit = (id) => clamp(G.c[id].recent / 30, 0, 1);
+const softened = (react, l) => Object.fromEntries(Object.entries(react).map(([k, v]) => [k, v < 0 ? v * (1 - l) : v]));
+
+// ---------- waves ----------
+function startWave() {
+  G.wave++; G.waveHits = 0; G.phase = 'wave'; G.t = 0;
+  const n = G.wave;
+  const news = [];
+  // escalation: far fronts join on their own as the war drags on, and neighbours whose relations collapsed may join
+  if (n >= 4) for (const id of ['yemen', 'iraq']) if (!G.c[id].active && Math.random() < 0.3) { G.c[id].active = 2; news.push(`${COUNTRIES[id].actor} הצטרפו לירי`); }
+  if (n >= 6 && !G.c.iran.active && !G.c.iran.struck && Math.random() < 0.2) { G.c.iran.active = 1; news.push('מתקפת טילים מאיראן'); }
+  for (const [id, code] of [['jordan', 'jo'], ['egypt', 'eg']]) if (G.p[code] < 10 && !G.c[id].active && Math.random() < 0.3) { G.c[id].active = 1; news.push(`${COUNTRIES[id].name} הצטרפה לירי אחרי קריסת היחסים`); }
+
+  // deterrence: states are only slightly restrained by it; terror organisations cut their fire sharply
+  const detF = clamp(1.3 - G.det / 100, 0.6, 1.3);
+  const detT = clamp(1.45 - G.det / 65, 0.3, 1.4);
+  const deter = (id) => (COUNTRIES[id].state ? detF : detT);
+  const total = (10 + 6 * n) * detT;
+  const leb = n >= 2 ? Math.min(0.5, 0.2 + 0.08 * n) : 0;
+  const count = { gaza: total * (1 - leb), lebanon: total * leb };
+  for (const id of Object.keys(COUNTRIES)) if (!BASE_FRONTS.includes(id) && G.c[id].active > 0) count[id] = (COUNTRIES[id].fire + n) * deter(id);
+  const dur = 38 + 6 * n;
+  const salvos = [];
+  for (const id of Object.keys(count)) {
+    const planMult = G.c[id].plan.length ? G.c[id].plan[0] : 1;
+    const coalMult = id === 'gaza' && G.coal.egypt ? 0.8 : 1;
+    let left = Math.round(count[id] * G.c[id].sup * planMult * coalMult);
+    while (left > 0) {
+      const size = Math.min(left, 1 + Math.floor(Math.random() * Math.min(2 + n, 7)));
+      salvos.push({ t: rnd(2, dur), size, front: id });
+      left -= size;
+    }
+  }
+  G.queue = [];
+  for (const s of salvos) {
+    for (let i = 0; i < s.size; i++) {
+      let kind = pick(COUNTRIES[s.front].kinds);
+      if (s.front === 'lebanon' && n < 3) kind = 'rocket';
+      if (s.front === 'syria' && n < 3 && kind === 'heavy') kind = 'rocket';
+      G.queue.push({ t: s.t + rnd(0, 0.9), front: s.front, kind });
+    }
+  }
+  G.queue.sort((a, b) => a.t - b.t);
+  for (const id of Object.keys(G.c)) { G.c[id].sup = 1; G.c[id].plan.shift(); if (G.c[id].active > 0 && !BASE_FRONTS.includes(id)) G.c[id].active--; }
+  const fronts = Object.keys(count).filter((id) => count[id] >= 0.5 && (id !== 'lebanon' || n >= 2)).map((id) => COUNTRIES[id].name);
+  $('waveNo').textContent = n;
+  say(`גל ${n} החל · ירי מ${fronts.join(', ')}`, 'warn');
+  news.forEach((m) => say(m, 'bad'));
+  if (detT <= 0.8) say(`הרתעה גבוהה: ארגוני הטרור מצמצמים ירי ב־${Math.round((1 - detT) * 100)}%`, 'good');
+  else if (detT >= 1.2) say('הרתעה נמוכה: ארגוני הטרור מגבירים את הירי', 'bad');
+  if (Object.keys(count).some((id) => COUNTRIES[id].kinds.some((k) => k[0] === 'ballistic'))) say('טילים בליסטיים בדרך: חץ וקלע דוד מיירטים אותם. לחץ ״המזרח התיכון״ כדי לראות אותם', 'warn');
+}
+
+let nextId = 1;
+function spawn(q) {
+  const F = COUNTRIES[q.front];
+  const from = F.origin();
+  const aim = city(pick(F.targets));
+  const d0 = dist(from, aim);
+  const spread = q.kind === 'uav' || q.kind === 'heavy' ? 0.6 : q.kind === 'ballistic' ? 1.6 : 0.9 + 0.035 * d0;
+  const to = { x: aim.x + gauss() * spread, y: aim.y + gauss() * spread };
+  const d = dist(from, to);
+  const T = q.kind === 'uav' ? clamp(d / 0.45, 12, 80) : q.kind === 'ballistic' ? 20 + d / 50 : q.kind === 'heavy' ? clamp(10 + d / 7, 12, 70) : 6 + d / 5;
+  const hitCity = CITIES.find((c) => dist(c, to) <= c.r) || null;
+  const th = { id: nextId++, kind: q.kind, front: q.front, from, to, t0: G.t, T, city: hitCity, locks: 0, trail: [], dead: false };
+  G.c[q.front].now++;
+  // partners that share the threat may shoot it down on the way
+  for (const co of COALITIONS) {
+    const ic = co.intercept;
+    if (G.coal[co.id] && ic && ic.fronts.includes(q.front) && ic.kinds.includes(q.kind) && Math.random() < ic.p) { th.allied = { at: rnd(0.3, 0.65), by: ic.by }; break; }
+  }
+  G.threats.push(th);
+  if (hitCity) { hitCity.alert++; announce(hitCity.name); }
+  if (q.kind !== 'ballistic' && dist(from, { x: 0, y: 0 }) < 250) SFX.enemyLaunch();
+}
+function posOf(th, t) {
+  const s = clamp((t - th.t0) / th.T, 0, 1);
+  return { x: th.from.x + (th.to.x - th.from.x) * s, y: th.from.y + (th.to.y - th.from.y) * s, s };
+}
+
+// ---------- interception ----------
+function solve(b, th) {
+  // earliest moment the interceptor can meet the threat inside the battery's range
+  const end = th.t0 + th.T * 0.96;
+  for (let t = G.t + 0.15; t < end; t += 0.05) {
+    const p = posOf(th, t);
+    const d = dist(b, p);
+    if (d <= b.range && d / b.v <= t - G.t) return { t, p };
+  }
+  return null;
+}
+function engage(th) {
+  if (!th || th.dead) return;
+  let best = null, any = false;
+  for (const b of G.batteries) {
+    if (!canEngage(b, th)) continue;
+    const sol = solve(b, th);
+    if (!sol) continue;
+    any = true;
+    if (b.ammo < 1) continue;
+    // a free laser shot beats spending an interceptor; otherwise take the earliest intercept
+    const better = !best || (b.type === 'laser') !== (best.b.type === 'laser') ? b.type === 'laser' || !best : sol.t < best.sol.t;
+    if (better) best = { b, sol };
+  }
+  if (!best) {
+    const sys = { ballistic: 'חץ וקלע דוד', heavy: 'קלע דוד', uav: 'כיפת ברזל או קלע דוד' }[th.kind] || 'כיפת ברזל';
+    const why = !any ? `${KIND_NAME[th.kind]}: אין סוללת ${sys} שתספיק ליירט` : `${KIND_NAME[th.kind]}: אין מיירטים זמינים בסוללות ${sys} שבטווח`;
+    say(why, 'warn'); SFX.denied(); return;
+  }
+  const { b, sol } = best;
+  b.ammo--; b.flash = 1; if (b.reloadT <= 0) b.reloadT = b.reload;
+  th.locks++;
+  G.fired++; G.cost += b.cost;
+  G.ints.push({ from: { x: b.x, y: b.y }, p: sol.p, t0: G.t, t1: sol.t, th, kill: Math.random() < b.pk[th.kind], sys: b.type, trail: [] });
+  if (b.type === 'laser') { G.fx.push({ kind: 'beam', x: sol.p.x, y: sol.p.y, bx: b.x, by: b.y, t: 0 }); SFX.laser(); }
+  else (b.type === 'dome' ? SFX.interceptor : SFX.arrow)();
+}
+
+// ---------- update ----------
+function update(dt) {
+  if (G.phase === 'strike') return updateSorties(dt);
+  if (G.phase !== 'wave') return;
+  G.t += dt;
+  while (G.queue.length && G.queue[0].t <= G.t) spawn(G.queue.shift());
+
+  for (const b of G.batteries) {
+    b.flash = Math.max(0, b.flash - dt * 2);
+    const stock = b.stock; // the laser has no stock: it just recharges
+    if (b.ammo < b.mag && (!stock || G[stock] > 0)) {
+      b.reloadT -= dt;
+      if (b.reloadT <= 0) { b.ammo++; if (stock) G[stock]--; b.reloadT = b.ammo < b.mag ? b.reload : 0; }
+    }
+  }
+
+  for (const it of G.ints) {
+    const k = clamp((G.t - it.t0) / (it.t1 - it.t0), 0, 1);
+    it.cur = { x: it.from.x + (it.p.x - it.from.x) * k, y: it.from.y + (it.p.y - it.from.y) * k };
+    it.trail.push(it.cur); if (it.trail.length > 18) it.trail.shift();
+    if (k >= 1) {
+      it.done = true;
+      const th = it.th;
+      th.locks--;
+      if (th.dead) continue;
+      if (it.kill) {
+        th.dead = true; G.kills++;
+        if (th.city) th.city.alert--;
+        G.fx.push({ x: it.p.x, y: it.p.y, t: 0, kind: 'kill' });
+        SFX.intercept();
+        if (th.city) say(`יירוט מוצלח מעל ${th.city.name}`, 'good');
+      } else {
+        G.fx.push({ x: it.p.x, y: it.p.y, t: 0, kind: 'miss' });
+        say('החטאה! האיום ממשיך', 'warn');
+      }
+    }
+  }
+  G.ints = G.ints.filter((i) => !i.done);
+
+  for (const th of G.threats) {
+    if (th.dead) continue;
+    const p = posOf(th, G.t);
+    th.cur = p;
+    th.trail.push({ x: p.x, y: p.y }); if (th.trail.length > 26) th.trail.shift();
+    if (th.allied && p.s >= th.allied.at) {
+      th.dead = true; G.alliedKills++;
+      if (th.city) th.city.alert--;
+      G.fx.push({ x: p.x, y: p.y, t: 0, kind: 'kill' });
+      say(`יורט בידי ${th.allied.by}`, 'good');
+      continue;
+    }
+    if (p.s >= 1) {
+      th.dead = true;
+      if (th.city) {
+        G.c[th.front].now += 2;
+        th.city.alert--; th.city.damage.push(G.wave); G.cityHits++; G.waveHits++;
+        const loss = th.city.w * G.shelter * ({ ballistic: 1.6, heavy: 1.3 }[th.kind] || 1);
+        G.trust = Math.max(0, G.trust - loss);
+        G.econ = Math.max(0, G.econ - th.city.w * 0.35);
+        G.fx.push({ x: th.to.x, y: th.to.y, t: 0, kind: 'hit' });
+        say(`נפילה ב${th.city.name}`, 'bad');
+        SFX.impact();
+      } else {
+        G.fx.push({ x: th.to.x, y: th.to.y, t: 0, kind: 'open' });
+        SFX.open();
+      }
+    }
+  }
+  G.threats = G.threats.filter((t) => !t.dead);
+  stepFx(dt);
+
+  if (G.trust <= 0) return gameOver();
+  if (!G.queue.length && !G.threats.length && !G.ints.length) endWave();
+}
+function stepFx(dt) {
+  G.fx.forEach((f) => (f.t += dt));
+  G.fx = G.fx.filter((f) => f.t < (f.kind === 'hit' ? 4 : f.kind === 'beam' ? 0.6 : 1.5));
+}
+
+function endWave() {
+  G.phase = 'between'; G.fx = [];
+  // allies resupply according to how they see Israel right now
+  const us = G.p.us >= 30 ? Math.round(G.p.us / 7) : 0;
+  const eu = (G.p.uk + G.p.fr + G.p.de) / 3 >= 40 ? 3 : 0;
+  G.reserve += us + eu;
+  if (G.p.us >= 50) { G.arrows += 1; G.stunners += 2; }
+  G.det = Math.max(0, G.det - 3);
+  for (const c of Object.values(G.c)) { c.recent = c.recent * 0.5 + c.now; c.now = 0; }
+  // coalitions fall apart when relations with a member sink well below what it took to form them
+  for (const co of COALITIONS) {
+    if (!G.coal[co.id]) continue;
+    const broke = Object.entries(co.need).find(([k, v]) => G.p[k] < v - 10);
+    if (broke) { G.coal[co.id] = false; say(`${co.name} התפרקה: היחסים עם ${PARTNERS[broke[0]].name} הידרדרו`, 'bad'); }
+  }
+  if (G.coal.hellenic) {
+    const t = Object.keys(AIRCRAFT).find((k) => G.fleet[k] < AIRCRAFT[k].count);
+    if (t) { G.fleet[t]++; say(`${AIRCRAFT[t].name} חזר לשירות בזכות הברית עם יוון וקפריסין`, 'good'); }
+  }
+  if (!G.waveHits) G.trust = Math.min(100, G.trust + 4);
+  // the treasury: income grows with public trust and with an economy that isn't being hit
+  const rebuilt = [];
+  let ruins = 0;
+  for (const c of CITIES) {
+    const before = c.damage.length;
+    c.damage = c.damage.filter((w) => G.wave - w < REBUILD);
+    if (c.damage.length < before) rebuilt.push(c.name);
+    ruins += c.damage.length;
+  }
+  if (rebuilt.length) { G.trust = Math.min(100, G.trust + rebuilt.length); say(`שיקום הושלם ב${rebuilt.join(', ')}`, 'good'); }
+  // sites still in ruins hold the economy back
+  G.econ = clamp(G.econ + (G.waveHits ? 1 : 4) + rebuilt.length * 1.5 - Math.min(3, ruins * 0.5), 0, 100);
+  const income = Math.round((25 + 0.45 * G.trust) * G.econ / 100);
+  G.budget += income;
+  say(`הכנסות המדינה לביטחון: +$${income}M (אמון ${Math.round(G.trust)}, כלכלה ${Math.round(G.econ)})`, 'good');
+  say(G.waveHits ? `גל ${G.wave} הסתיים · ${G.waveHits} נפילות בערים` : `גל ${G.wave} הסתיים ללא נפילות בערים`, G.waveHits ? 'warn' : 'good');
+  say(us + eu ? `סיוע${us ? ' אמריקאי' : ''}${eu ? (us ? ' ואירופי' : ' אירופי') : ''}: +${us + eu} מיירטים למלאי` : 'בידוד מדיני: לא התקבל סיוע', us + eu ? 'good' : 'bad');
+  CITIES.forEach((c) => (c.alert = 0));
+  saveGame();
+  setTimeout(showDecision, 1400);
+}
+
+// ---------- cabinet decisions ----------
+// fx.rel moves every partner; fx.relTo moves specific ones
+const CARDS = [
+  { id: 'egypt', title: 'מצרים מציעה תיווך', text: 'קהיר מציעה הפסקת אש זמנית מול עזה. הקבינט צריך להחליט עכשיו.', when: () => !G.c.egypt.struck, opts: [
+    { label: 'לקבל את התיווך', hint: 'פחות ירי מעזה בגל הבא · מצרים +15 · כולם +4 · אמון −4', fx: { gaza: 0.4, rel: 4, relTo: { eg: 15 }, trust: -4 } },
+    { label: 'לדחות ולהמשיך במבצע', hint: 'יותר ירי מעזה בגל הבא · מצרים −10 · אירופה −4', fx: { gaza: 1.3, relTo: { eg: -10, fr: -4, uk: -4, de: -4 } } }] },
+  { id: 'us', title: 'וושינגטון על הקו', text: 'הממשל האמריקאי מוכן להעביר משלוח מיירטים דחוף, ומבקש איפוק בגזרה הצפונית.', opts: [
+    { label: 'לבקש משלוח חירום', hint: 'כיפה +50 · חץ +4 · קלע דוד +6 · ארה״ב −8', fx: { reserve: 50, arrows: 4, stunners: 6, relTo: { us: -8 } } },
+    { label: 'לבקש ולהתחייב לאיפוק בצפון', hint: 'מלאי +35 · ארה״ב +6 · יותר ירי מלבנון', fx: { reserve: 35, relTo: { us: 6 }, lebanon: 1.4 } },
+    { label: 'לא לבקש בינתיים', hint: 'ארה״ב +4', fx: { relTo: { us: 4 } } }] },
+  { id: 'hezb', title: 'חיזבאללה מאיים', text: 'אמ״ן מעריך שחיזבאללה מתכונן להרחיב את הירי על הצפון בימים הקרובים.', opts: [
+    { label: 'מסר מרתיע דרך פריז', hint: 'צרפת +8', fx: { relTo: { fr: 8 } } },
+    { label: 'איום פומבי של ראש הממשלה', hint: 'הרתעה +8 · אירופה −4', fx: { det: 8, relTo: { fr: -4, uk: -4, de: -4 } } },
+    { label: 'להתעלם', hint: 'יותר ירי מלבנון בגל הבא', fx: { lebanon: 1.5 } }] },
+  { id: 'battery', title: 'סוללה נוספת זמינה', text: 'סוללת מילואים מוכנה לפריסה. הטעינה הראשונה שלה תבוא מהמלאי הלאומי.', opts: [
+    { label: 'לפרוס בירושלים', hint: 'סוללה חדשה · מלאי −15', fx: { battery: 'jlm', reserve: -15 } },
+    { label: 'לפרוס בבאר שבע', hint: 'סוללה חדשה · מלאי −15', fx: { battery: 'bs', reserve: -15 } },
+    { label: 'להשאיר במילואים', hint: 'מלאי +10', fx: { reserve: 10 } }] },
+  { id: 'upper', title: 'מימון אמריקאי לסוללות', text: 'הקונגרס אישר מימון לסוללת הגנה נוספת. משרד הביטחון צריך לבחור איזו.', when: () => G.p.us >= 45 && G.batteries.filter((b) => b.type !== 'dome').length < 6, opts: [
+    { label: 'סוללת חץ בצפון', hint: 'סוללת חץ חדשה · חץ +4', fx: { battery: 'arrow3', arrows: 4 } },
+    { label: 'סוללת קלע דוד בדרום', hint: 'סוללת קלע דוד חדשה · קלע +8', fx: { battery: 'sling3', stunners: 8 } },
+    { label: 'רק מיירטים', hint: 'חץ +3 · קלע +6', fx: { arrows: 3, stunners: 6 } }] },
+  { id: 'un', title: 'מועצת הביטחון מתכנסת', text: 'האו״ם דורש מכל הצדדים ריסון. העולם מחכה לתגובה הישראלית.', opts: [
+    { label: 'להודיע על ריסון', hint: 'כולם +6 · הרתעה −5', fx: { rel: 6, det: -5 } },
+    { label: 'לדחות את הדרישה', hint: 'כולם −5 · ארה״ב +2 · אמון +4', fx: { rel: -5, relTo: { us: 2 }, trust: 4 } }] },
+  { id: 'home', title: 'פיקוד העורף', text: 'פיקוד העורף מבקש להחמיר את ההנחיות ולסגור מוסדות לימוד ומקומות עבודה.', opts: [
+    { label: 'להחמיר הנחיות', hint: 'נפילות בערים פוגעות פחות באמון בגל הבא · אמון −3 · כלכלה −8', fx: { shelter: 0.5, trust: -3, econ: -8 } },
+    { label: 'שגרה ככל האפשר', hint: 'אמון +3 · כלכלה +3', fx: { trust: 3, econ: 3 } }] },
+  { id: 'aid', title: 'חבילת סיוע אמריקאית', text: 'הממשל מציע סיוע כספי חירום, בתנאי שישראל תתאם איתו את המהלכים הבאים.', when: () => G.p.us >= 50, opts: [
+    { label: 'לקבל', hint: 'תקציב +$60M · ארה״ב +3 · הרתעה −4', fx: { budget: 60, relTo: { us: 3 }, det: -4 } },
+    { label: 'לסרב', hint: 'הרתעה +3', fx: { det: 3 } }] },
+  { id: 'bonds', title: 'משרד האוצר', text: 'האוצר מציע להנפיק אג״ח מלחמה כדי לממן את ההגנה, על חשבון הכלכלה בהמשך.', opts: [
+    { label: 'להנפיק אג״ח', hint: 'תקציב +$50M · כלכלה −6', fx: { budget: 50, econ: -6 } },
+    { label: 'לקצץ בתקציבים אחרים', hint: 'תקציב +$20M · אמון −3', fx: { budget: 20, trust: -3 } },
+    { label: 'בלי שינוי', hint: 'כלכלה +2', fx: { econ: 2 } }] },
+  { id: 'gulf', title: 'ערוץ חשאי במפרץ', text: 'אבו דאבי מציעה לתווך מול ריאד ולהעביר מסרים לטהרן.', opts: [
+    { label: 'להיענות', hint: 'האמירויות +8 · סעודיה +8 · הרתעה −3', fx: { relTo: { ae: 8, sa: 8 }, det: -3 } },
+    { label: 'לסרב בנימוס', hint: 'האמירויות −4', fx: { relTo: { ae: -4 } } }] },
+  { id: 'russia', title: 'מוסקבה מבקשת תיאום', text: 'רוסיה מבקשת מנגנון תיאום כדי למנוע תקלות בשמי סוריה.', opts: [
+    { label: 'להקים מנגנון תיאום', hint: 'רוסיה +10 · ארה״ב −4', fx: { relTo: { ru: 10, us: -4 } } },
+    { label: 'לדחות', hint: 'רוסיה −8', fx: { relTo: { ru: -8 } } }] },
+  { id: 'apology', title: 'משבר מדיני', text: 'שגרירים זומנו לבירור אחרי התקיפות. בירות ערב דורשות צעד מרגיע.', when: () => G.c.jordan.struck || G.c.egypt.struck, opts: [
+    { label: 'להתנצל ולפצות', hint: 'ירדן ומצרים +20 · כולם +4 · הרתעה −8', fx: { relTo: { jo: 20, eg: 20 }, rel: 4, det: -8 } },
+    { label: 'לעמוד על שלנו', hint: 'הרתעה +5 · כולם −4', fx: { det: 5, rel: -4 } }] }
+];
+function showDecision() {
+  if (G.phase === 'over') return;
+  const deployed = new Set(G.batteries.map((b) => b.id));
+  let pool = CARDS.filter((c) => !G.usedCards.slice(-3).includes(c.id) && (!c.when || c.when()));
+  pool = pool.filter((c) => c.id !== 'battery' || !(deployed.has('jlm') && deployed.has('bs')));
+  const card = pool[Math.floor(Math.random() * pool.length)];
+  G.usedCards.push(card.id);
+  $('decKicker').textContent = `החלטת קבינט · לפני גל ${G.wave + 1}`;
+  $('decTitle').textContent = card.title;
+  $('decText').textContent = card.text;
+  const box = $('decOpts'); box.innerHTML = '';
+  for (const o of card.opts) {
+    if (o.fx.battery && deployed.has(o.fx.battery)) continue;
+    box.appendChild(optButton(o.label, o.hint, () => { applyFx(o.fx); $('decision').hidden = true; showStrike(); }));
+  }
+  $('decision').hidden = false;
+}
+function optButton(label, hint, onclick) {
+  const b = document.createElement('button');
+  b.className = 'opt';
+  b.innerHTML = '<b></b><span></span>';
+  b.querySelector('b').textContent = label;
+  b.querySelector('span').textContent = hint;
+  b.onclick = onclick;
+  return b;
+}
+function applyFx(fx) {
+  G.shelter = 1;
+  if (fx.rel) relAll(fx.rel);
+  if (fx.relTo) relShift(fx.relTo);
+  if (fx.det) G.det = clamp(G.det + fx.det, 0, 100);
+  if (fx.trust) G.trust = clamp(G.trust + fx.trust, 1, 100);
+  if (fx.reserve) G.reserve = Math.max(0, G.reserve + fx.reserve);
+  if (fx.arrows) G.arrows += fx.arrows;
+  if (fx.stunners) G.stunners += fx.stunners;
+  if (fx.gaza) G.c.gaza.sup *= fx.gaza;
+  if (fx.lebanon) G.c.lebanon.sup *= fx.lebanon;
+  if (fx.shelter) G.shelter = fx.shelter;
+  if (fx.econ) G.econ = clamp(G.econ + fx.econ, 0, 100);
+  if (fx.budget) G.budget += fx.budget;
+  if (fx.battery) { G.batteries.push(addBattery(fx.battery)); say(`נפרסה סוללה חדשה: ${BATTERY_SITES[fx.battery][0]}`, 'good'); }
+}
+
+// ---------- air strikes ----------
+// plan[country][aircraft] = planes sent. Several countries, and several aircraft types per country, go out together.
+let plan = {}, pickC = null;
+// chance a plane that gets through hits its target; air defences mostly matter through lossRisk below
+const chance = (cid, aid) => clamp(AIRCRAFT[aid].base - COUNTRIES[cid].air * AIRCRAFT[aid].airMul * 0.5, 0.3, 0.97);
+// risk that a plane is shot down: zero over terror organisations, modest over states, lower still for the stealthy F-35
+const lossRisk = (cid, aid) => COUNTRIES[cid].state ? COUNTRIES[cid].air * 0.4 * AIRCRAFT[aid].airMul : 0;
+const planned = (cid) => Object.values(plan[cid] || {}).reduce((a, b) => a + b, 0);
+const assigned = (aid) => Object.values(plan).reduce((s, m) => s + (m[aid] || 0), 0);
+// a bigger raid on the same country draws a stronger reaction from its friends
+const SORTIE_COST = 2, KILL_COST = 3; // $M per plane sent, per killing operation
+const outrage = (n) => Math.min(1.6, 1 + 0.15 * (n - 1));
+const leaderUp = (L) => { const st = G.lead[L.id]; return !st || st.dead == null || G.wave - st.dead >= SUCCESSOR; };
+const leaderChance = (L) => { const st = G.lead[L.id] || {}; return clamp(L.p * Math.pow(0.6, st.alert || 0) * (st.dead != null ? 1.15 : 1), 0.1, 0.9); };
+function leaderReact(L, scale = 1) {
+  const r = {}, soft = softened(L.react, legit(L.org));
+  for (const [k, v] of Object.entries(soft)) r[k] = (r[k] || 0) + v * scale;
+  for (const [k, v] of Object.entries(L.host || {})) r[k] = (r[k] || 0) + v * scale;
+  return r;
+}
+
+function showStrike() {
+  plan = {}; pickC = null; G.killPick = null;
+  setTab('air');
+  $('strikeKicker').textContent = `חדר מבצעים · לפני גל ${G.wave + 1}`;
+  const box = $('strikeCountries'); box.innerHTML = '';
+  for (const [id, c] of Object.entries(COUNTRIES)) {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.id = id;
+    const tag = legit(id) >= 0.6 ? '<i class="tag fire">יורה · לגיטימי</i>' : firing(id) ? '<i class="tag fire">יורה</i>' : c.stance === 'neutral' ? '<i class="tag neutral">ניטרלית</i>' : '<i class="tag">עוינת</i>';
+    b.innerHTML = `<b></b><span></span>${tag}<em class="count" hidden></em>`;
+    b.querySelector('b').textContent = c.name;
+    b.querySelector('span').textContent = c.actor;
+    b.onclick = () => { pickC = id; renderStrike(); };
+    box.appendChild(b);
+  }
+  renderStrike();
+  $('strike').hidden = false;
+}
+function renderStrike() {
+  document.querySelectorAll('#strikeCountries .chip').forEach((b) => {
+    const n = planned(b.dataset.id), cnt = b.querySelector('.count');
+    b.classList.toggle('sel', b.dataset.id === pickC);
+    cnt.hidden = !n; cnt.textContent = n;
+  });
+  const planes = $('strikePlanes'); planes.innerHTML = '';
+  $('planesBox').hidden = !pickC;
+  if (pickC) {
+    const c = COUNTRIES[pickC];
+    const l = Math.round(legit(pickC) * 100);
+    $('planesTitle').textContent = `מטוסים לתקיפה ב${c.name} · לגיטימציה ${l}%` + (l >= 100 ? ': התקיפה לא תפגע ביחסי החוץ' : l ? `: הפגיעה ביחסי החוץ קטנה ב־${l}%` : '');
+    for (const [id, a] of Object.entries(AIRCRAFT)) {
+      const mine = (plan[pickC] || {})[id] || 0, free = G.fleet[id] - assigned(id);
+      const why = c.far && !a.long ? 'טווח קצר מדי ליעד הזה' : !G.fleet[id] ? 'אין מטוסים זמינים' : '';
+      const row = document.createElement('div');
+      row.className = 'plane' + (why ? ' off' : '');
+      row.innerHTML = `<div class="info"><b></b><span></span></div><div class="stepper"><button aria-label="פחות">−</button><output>0</output><button aria-label="יותר">+</button></div>`;
+      row.querySelector('b').textContent = `${a.name} · ${free} פנויים מתוך ${G.fleet[id]}`;
+      const risk = Math.round(lossRisk(pickC, id) * 100);
+      row.querySelector('span').textContent = why || `${a.note} · סיכוי פגיעה ${Math.round(chance(pickC, id) * 100)}% · ` + (risk ? `סיכון שיופל ${risk}%` : 'בלי סיכון ליירוט');
+      row.querySelector('output').textContent = mine;
+      const [minus, plus] = row.querySelectorAll('button');
+      minus.disabled = !mine; plus.disabled = !!why || free < 1;
+      minus.onclick = () => setPlanes(pickC, id, mine - 1);
+      plus.onclick = () => setPlanes(pickC, id, mine + 1);
+      planes.appendChild(row);
+    }
+  }
+  // mission list
+  renderKills();
+  const ms = $('strikeMissions'), ids = Object.keys(plan).filter((k) => planned(k)), L = LEADERS.find((x) => x.id === G.killPick);
+  ms.innerHTML = ids.length || L ? '' : '<span class="empty">עדיין לא נקבעו משימות.</span>';
+  if (L) { const d = document.createElement('div'); d.textContent = `חיסול: ${L.title} (${L.where})`; ms.appendChild(d); }
+  for (const id of ids) {
+    const d = document.createElement('div');
+    d.textContent = `${COUNTRIES[id].name}: ` + Object.entries(plan[id]).filter(([, n]) => n).map(([a, n]) => `${AIRCRAFT[a].name.split(' ')[0]} ×${n}`).join(' · ');
+    ms.appendChild(d);
+  }
+  // expected outcome for the whole plan
+  const out = $('strikeOutcome'), lines = [];
+  if (ids.length || L) {
+    const rel = {}; let det = 0;
+    if (L) {
+      det += L.det;
+      for (const [k, v] of Object.entries(leaderReact(L))) rel[k] = (rel[k] || 0) + v;
+      lines.push(['warn', `⚠ אחרי חיסול: ירי נקמה מוגבר מ${COUNTRIES[L.org].name} בגל הבא, ואחריו ירידה בירי למשך ${L.after.length - 1 || 1} גלים`]);
+      if (L.patron) lines.push(['warn', '⚠ איראן עלולה להגיב בטילים בליסטיים']);
+    }
+    for (const id of ids) {
+      const c = COUNTRIES[id];
+      det += c.det;
+      for (const [k, v] of Object.entries(softened(c.react, legit(id)))) rel[k] = (rel[k] || 0) + v * outrage(planned(id));
+      if (c.stance === 'neutral') lines.push(['warn', `⚠ ${c.name} תגיב בירי על ישראל בשני הגלים הבאים`]);
+      else if (id === 'iran') lines.push(['warn', '⚠ איראן תגיב במטח טילים בליסטיים']);
+      else if (!firing(id)) lines.push(['warn', `⚠ ייתכן ש${c.actor} יגיבו בירי`]);
+    }
+    const worst = Object.entries(rel).map(([k, v]) => [k, Math.round(v)]).filter(([, v]) => v).sort((a, b) => a[1] - b[1]);
+    lines.unshift(['', `בהצלחה: הרתעה עד +${det}.` + (ids.length ? ' יכולת הירי של היעדים נפגעת לפי מספר הפגיעות.' : '')]);
+    if (worst.length) lines.splice(1, 0, ['bad', 'יחסי חוץ: ' + worst.slice(0, 5).map(([k, v]) => `${PARTNERS[k].name} ${signed(v)}`).join(' · ') + (worst.length > 5 ? ' …' : '')]);
+    const states = ids.filter((id) => COUNTRIES[id].state).map((id) => COUNTRIES[id].name);
+    if (states.length) lines.push(['warn', `⚠ ל${states.join(' ול')} יש הגנה אווירית: מטוס עלול להיות מופל (אמון −4 לכל מטוס)`]);
+    else if (ids.length) lines.push(['', 'לארגוני טרור אין יכולת להפיל מטוסים: הסיכון היחיד הוא החטאה.']);
+  } else lines.push(['', 'בחר יעד, הוסף מטוסים, ואפשר לעבור ליעד נוסף. אפשר גם להמשיך בלי תקיפה.']);
+  out.innerHTML = '';
+  for (const [cls, t] of lines) { const d = document.createElement('div'); d.className = cls; d.textContent = t; out.appendChild(d); }
+  const total = ids.reduce((s, id) => s + planned(id), 0);
+  const price = total * SORTIE_COST + (L ? KILL_COST : 0), short = price > G.budget;
+  if (price) { const d = document.createElement('div'); d.className = short ? 'bad' : ''; d.textContent = `עלות המבצע: $${price}M מתוך תקציב של $${Math.round(G.budget)}M` + (short ? ' · אין מספיק תקציב' : ''); out.appendChild(d); }
+  $('strikeGo').disabled = (!total && !L) || short;
+  $('strikeGo').textContent = total ? `בצע · ${total} מטוסים ל־${ids.length} יעדים${L ? ' + חיסול' : ''}` : L ? 'בצע חיסול' : 'בצע תקיפות';
+}
+function setTab(t) {
+  $('tabAir').classList.toggle('sel', t === 'air'); $('tabKill').classList.toggle('sel', t === 'kill');
+  $('airPane').hidden = t !== 'air'; $('killPane').hidden = t !== 'kill';
+}
+function renderKills() {
+  const box = $('killList'); box.innerHTML = '';
+  for (const L of LEADERS) {
+    const st = G.lead[L.id] || {}, up = leaderUp(L);
+    const name = L.title + (st.dead != null && up ? ' (המחליף)' : '');
+    const l = Math.round(legit(L.org) * 100);
+    const hint = up ? `${L.where} · סיכוי ${Math.round(leaderChance(L) * 100)}% · הרתעה +${L.det}` + (l ? ` · לגיטימציה ${l}%` : '') + (L.host && Object.values(L.host).some((v) => v < -10) ? ' · ⚠ פעולה בשטח מדינה ריבונית' : '')
+      : `חוסל · מחליף ימונה בעוד ${SUCCESSOR - (G.wave - st.dead)} גלים`;
+    const b = optButton(name, hint, () => { G.killPick = G.killPick === L.id ? null : L.id; renderStrike(); });
+    b.disabled = !up;
+    b.classList.toggle('sel', G.killPick === L.id);
+    box.appendChild(b);
+  }
+}
+function setPlanes(cid, aid, n) {
+  plan[cid] = plan[cid] || {};
+  plan[cid][aid] = Math.max(0, n);
+  renderStrike();
+}
+function launchStrikes() {
+  $('strike').hidden = true;
+  const price = Object.keys(plan).reduce((s, id) => s + planned(id), 0) * SORTIE_COST + (G.killPick ? KILL_COST : 0);
+  G.budget -= price; G.spent += price;
+  G.sorties = [];
+  let i = 0;
+  for (const [cid, m] of Object.entries(plan)) {
+    for (const [aid, n] of Object.entries(m)) {
+      for (let k = 0; k < n; k++) {
+        const home = km(...AIRCRAFT[aid].home), aim = km(...COUNTRIES[cid].aim);
+        const from = { x: home.x + rnd(-4, 4), y: home.y + rnd(-4, 4) }, to = { x: aim.x + rnd(-6, 6), y: aim.y + rnd(-6, 6) };
+        G.sorties.push({ c: cid, a: aid, from, to, delay: (i++ % 6) * 0.25, dur: 1.8 + dist(from, to) / 700, t: 0 });
+      }
+    }
+  }
+  const L = LEADERS.find((x) => x.id === G.killPick);
+  if (L) { const from = km(31.21, 35.01), to = km(...L.at); G.sorties.push({ kill: true, from, to, delay: 0, dur: 1.8 + dist(from, to) / 700, t: 0 }); }
+  G.phase = 'strike'; G.strikeDone = false;
+  const pts = G.sorties.flatMap((s) => [s.from, s.to]);
+  flyTo(fitBox(pts, 60));
+  SFX.jet();
+}
+function updateSorties(dt) {
+  let done = true;
+  for (const s of G.sorties) {
+    s.t += dt;
+    if (s.t < s.delay + s.dur) done = false;
+    else if (!s.boom) { s.boom = true; G.fx.push({ x: s.to.x, y: s.to.y, t: 0, kind: 'kill' }); }
+  }
+  stepFx(dt);
+  if (done && !G.strikeDone) { G.strikeDone = true; SFX.impact(); setTimeout(resolveStrikes, 500); }
+}
+function resolveStrikes() {
+  const lines = [];
+  let hitsAll = 0, sent = 0;
+  for (const [cid, m] of Object.entries(plan)) {
+    const n = planned(cid); if (!n) continue;
+    const c = COUNTRIES[cid], st = G.c[cid];
+    let hits = 0, lost = 0, sup = 1;
+    for (const [aid, k] of Object.entries(m)) {
+      for (let i = 0; i < k; i++) {
+        if (Math.random() < lossRisk(cid, aid)) { lost++; G.fleet[aid]--; }
+        else if (Math.random() < chance(cid, aid)) { hits++; sup *= AIRCRAFT[aid].punch; }
+      }
+    }
+    sent += n; hitsAll += hits; G.lost += lost; G.strikes++; st.struck++;
+    const parts = [`${c.name}: ${hits} מתוך ${n} מטוסים פגעו`];
+    if (hits) {
+      const det = Math.round(c.det * (1 + 0.3 * (hits - 1)));
+      G.det = clamp(G.det + det, 0, 100);
+      parts.push(`הרתעה +${det}`);
+      if (firing(cid)) {
+        st.sup = Math.max(0.15, sup);
+        if (!BASE_FRONTS.includes(cid)) st.active = hits >= 3 ? 0 : Math.max(0, st.active - 1);
+        parts.push(st.active === 0 && !BASE_FRONTS.includes(cid) ? 'הירי משם שותק' : `הירי בגל הבא יורד ב־${Math.round((1 - st.sup) * 100)}%`);
+      }
+    }
+    if (n - hits - lost) parts.push(`${n - hits - lost} החטיאו`);
+    if (lost) { G.trust = Math.max(1, G.trust - 4 * lost); parts.push(lost === 1 ? 'מטוס אחד הופל' : `${lost} מטוסים הופלו`); }
+    relShift(softened(c.react, legit(cid)), outrage(n));
+    // who answers fire with fire
+    if (c.stance === 'neutral') { st.active = Math.max(st.active, 2); parts.push('תגיב בירי בשני הגלים הבאים'); }
+    else if (cid === 'iran') { st.active = Math.max(st.active, 1); parts.push('מכריזה על תגובה'); }
+    else if (!firing(cid) && Math.random() < 0.5) { st.active = 1; parts.push('מגיבים בירי'); }
+    lines.push(parts.join(' · '));
+  }
+  const L = LEADERS.find((x) => x.id === G.killPick);
+  if (L) {
+    sent++;
+    const st = G.lead[L.id] = G.lead[L.id] || {}, c = G.c[L.org];
+    if (Math.random() < leaderChance(L)) {
+      hitsAll++; G.kills2++;
+      st.dead = G.wave; st.alert = 0;
+      G.det = clamp(G.det + L.det, 0, 100);
+      relShift(leaderReact(L));
+      // revenge first, then disarray
+      L.after.forEach((m, i) => (c.plan[i] = (c.plan[i] ?? 1) * m));
+      if (L.after[0] > 1 && !firing(L.org)) c.active = Math.max(c.active, 1);
+      const parts = [`${L.title} חוסל ב${L.where}`, `הרתעה +${L.det}`];
+      if (L.after[0] > 1) parts.push(`צפוי ירי נקמה מ${COUNTRIES[L.org].name} בגל הבא`);
+      if (L.after.length > 1) parts.push(`אחר כך הירי משם ייחלש`);
+      if (L.proxies) { for (const id of ['lebanon', 'syria', 'iraq']) { G.c[id].plan[0] = (G.c[id].plan[0] ?? 1) * L.proxies; G.c[id].plan[1] = (G.c[id].plan[1] ?? 1) * L.proxies; } parts.push('השלוחים של איראן נחלשים לשני גלים'); }
+      if (L.patron && Math.random() < L.patron) { G.c.iran.active = Math.max(G.c.iran.active, 1); parts.push('איראן מכריזה על נקמה'); }
+      lines.push(parts.join(' · '));
+    } else {
+      st.alert = (st.alert || 0) + 1;
+      G.trust = Math.max(1, G.trust - 3);
+      relShift(leaderReact(L, 0.5));
+      lines.push(`ניסיון החיסול של ${L.title} נכשל · הוא ירד למחתרת והסיכוי בפעם הבאה קטן · אמון −3`);
+    }
+  }
+  lines.push(`יחסי חוץ כעת: ${G.rel}. פירוט במפת יחסי החוץ 🌐`);
+  const ok = hitsAll / Math.max(1, sent);
+  $('resTitle').textContent = ok >= 0.75 ? 'התקיפות הצליחו' : ok > 0 ? 'הצלחה חלקית' : 'התקיפות נכשלו';
+  $('resTitle').style.color = ok >= 0.75 ? 'var(--green)' : ok > 0 ? 'var(--amber)' : 'var(--red)';
+  $('resLines').innerHTML = '';
+  for (const l of lines) { const li = document.createElement('li'); li.textContent = l; $('resLines').appendChild(li); }
+  if (G.phase === 'strike') $('result').hidden = false;
+}
+
+// ---------- saving ----------
+// The game is saved in this browser after every wave. A wave in progress is not saved:
+// coming back resumes at the break before the next wave.
+const SAVE_KEY = 'idSave', SAVE_VERSION = 1;
+const TRANSIENT = ['threats', 'ints', 'fx', 'queue', 'sorties', 'speed', 'paused', 'dipl', 'placing', 'hover', 'killPick', 'diplOpen', 'strikeDone'];
+function saveGame() {
+  const g = Object.fromEntries(Object.entries(G).filter(([k]) => !TRANSIENT.includes(k)));
+  const data = { v: SAVE_VERSION, at: Date.now(), g, cities: Object.fromEntries(CITIES.map((c) => [c.name, c.damage])) };
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function loadSave() {
+  try { const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); return d && d.v === SAVE_VERSION ? d : null; } catch (e) { return null; }
+}
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+function resumeGame(d) {
+  newGame();
+  Object.assign(G, d.g, { phase: 'between', speed: 1, paused: false });
+  // batteries take their numbers from the current rules, keeping only their own state
+  G.batteries = G.batteries.map((b) => ({ ...b, ...SYSTEMS[b.type], ammo: Math.min(b.ammo, SYSTEMS[b.type].mag) }));
+  for (const c of CITIES) c.damage = d.cities[c.name] || [];
+  syncRel();
+  $('waveNo').textContent = G.wave;
+  say(`המשמרת נמשכת: גל ${G.wave} הושלם`, 'good');
+  showDecision();
+}
+
+function gameOver() {
+  G.phase = 'over';
+  clearSave();
+  const best = Math.max(+(store.get('idBest') || 0), G.wave - 1);
+  store.set('idBest', best);
+  $('overTitle').textContent = 'אמון הציבור קרס';
+  const rows = [['גלים שהושלמו', G.wave - 1], ['יירוטים', G.kills], ['נפילות בערים', G.cityHits], ['מיירטים ששוגרו', G.fired], ['תקיפות', G.strikes], ['מטוסים שהופלו', G.lost], ['בכירים שחוסלו', G.kills2], ['יירוטים של שותפים', G.alliedKills], ['יחסי חוץ', G.rel], ['עלות המיירטים ששוגרו', '$' + (G.cost / 1000).toFixed(1) + 'M'], ['הוצאות רכש ומבצעים', '$' + Math.round(G.spent) + 'M'], ['שיא אישי', best + ' גלים']];
+  $('overStats').innerHTML = rows.map(([k, v]) => `<div>${k}<b class="num">${v}</b></div>`).join('');
+  $('over').hidden = false;
+}
+
+// ---------- foreign relations panel ----------
+const relColor = (v) => v >= 60 ? '#2F8A5B' : v >= 45 ? '#5E8A3A' : v >= 30 ? '#9A7A2A' : v >= 15 ? '#9A4A2A' : '#8A3030';
+function renderDipl() {
+  $('diplAvg').textContent = `ציון משוקלל: ${G.rel} מתוך 100`;
+  const row = (k) => {
+    const p = PARTNERS[k], v = G.p[k], wrap = document.createElement('div'), d = document.createElement('button');
+    d.className = 'rel' + (G.diplOpen === k ? ' open' : '');
+    d.innerHTML = '<span></span><span class="bar"><i></i></span><b></b>' + (p.note ? '<small></small>' : '');
+    d.querySelector('span').textContent = (G.diplOpen === k ? '▾ ' : '▸ ') + p.name;
+    d.querySelector('i').style.width = v + '%'; d.querySelector('i').style.background = relColor(v);
+    d.querySelector('b').textContent = v;
+    if (p.note) d.querySelector('small').textContent = p.note;
+    d.onclick = () => { G.diplOpen = G.diplOpen === k ? null : k; renderDipl(); };
+    wrap.appendChild(d);
+    if (G.diplOpen === k) wrap.appendChild(diploActions(k));
+    return wrap;
+  };
+  const g = $('diplGlobal'); g.innerHTML = '';
+  g.appendChild(diploButton(DIPLO_GLOBAL, '_gaza', DIPLO_GLOBAL.fx));
+  $('diplPowers').replaceChildren(...['us', 'uk', 'fr', 'de', 'ru', 'cn'].map(row));
+  $('diplRegion').replaceChildren(...Object.keys(PARTNERS).filter((k) => PARTNERS[k].map).sort((a, b) => G.p[b] - G.p[a]).map(row));
+}
+// one button for a diplomatic move; key = who it's used up for this wave
+function diploButton(a, key, fx, k) {
+  const used = G.diplUsed[key] === G.wave, low = a.need && G.p[k] < a.need;
+  const b = optButton(`${a.label}${a.cost ? ` · $${a.cost}M` : ''}`, used ? 'כבר בוצע פעולה מולה בגל הזה' : low ? `דרוש לפחות ${a.need} ביחסים` : a.hint, () => {
+    G.budget -= a.cost; G.spent += a.cost; G.diplUsed[key] = G.wave;
+    applyFx(Object.assign({}, fx, { shelter: G.shelter }));
+    say(`${a.label}${k ? ` (${PARTNERS[k].name})` : ''}: בוצע`, 'good');
+    renderDipl();
+  });
+  b.disabled = used || low || G.budget < a.cost;
+  return b;
+}
+function diploActions(k) {
+  const box = document.createElement('div');
+  box.className = 'opts diplo';
+  for (const a of [...DIPLO_COMMON, DIPLO_SPECIAL[k]].filter(Boolean)) box.appendChild(diploButton(a, k, typeof a.fx === 'function' ? a.fx(k) : a.fx, k));
+  return box;
+}
+function renderShop() {
+  $('shopBudget').textContent = `תקציב: $${Math.round(G.budget)}M · כלכלה ${Math.round(G.econ)} · הוצאות עד כה $${Math.round(G.spent)}M`;
+  const box = $('shopList'); box.innerHTML = '';
+  for (const [type, it] of Object.entries(SHOP)) {
+    const stock = SYSTEMS[type].stock, d = document.createElement('div');
+    d.className = 'coal';
+    if (it.fromWave && G.wave < it.fromWave) {
+      d.innerHTML = '<b></b><p></p><small></small>';
+      d.querySelector('b').textContent = it.name; d.querySelector('p').textContent = it.what;
+      d.querySelector('small').textContent = `בפיתוח ברפא״ל · זמין מגל ${it.fromWave} · $${it.battery}M לסוללה`;
+      box.appendChild(d); continue;
+    }
+    const free = Object.entries(BATTERY_SITES).filter(([id, v]) => (v[3] || 'dome') === type && !G.batteries.some((b) => b.id === id));
+    d.innerHTML = `<b></b><p></p>
+      <div class="buy"><span>מלאי מיירטים, משותף לכל הסוללות</span><button data-k="pack"></button></div>
+      <div class="buy"><span>סוללה חדשה</span><select></select><button data-k="bat"></button></div>`;
+    d.querySelector('b').textContent = `${it.name} · ${G.batteries.filter((b) => b.type === type).length} סוללות` + (stock ? ` · ${G[stock]} מיירטים במלאי` : '');
+    d.querySelector('p').textContent = stock ? `מיירט ל${it.what}` : it.what;
+    if (!stock) d.querySelector('.buy').remove();
+    const pack = d.querySelector('[data-k=pack]') || {}, bat = d.querySelector('[data-k=bat]'), sel = d.querySelector('select');
+    pack.textContent = `+${it.pack} מיירטים · $${it.packCost}M`;
+    pack.disabled = G.budget < it.packCost;
+    pack.onclick = () => { G.budget -= it.packCost; G.spent += it.packCost; G[stock] += it.pack; renderShop(); };
+    for (const [id, v] of free) { const o = document.createElement('option'); o.value = id; o.textContent = v[0]; sel.appendChild(o); }
+    sel.hidden = !free.length;
+    bat.textContent = free.length ? `לפרוס · $${it.battery}M` : 'כל האתרים תפוסים';
+    bat.disabled = !free.length || G.budget < it.battery;
+    if (it.anywhere) {
+      sel.remove();
+      d.querySelector('.buy:last-child span').textContent = 'סוללה חדשה: בוחרים מיקום על המפה, כמה שרוצים';
+      bat.textContent = `מקם על המפה · $${it.battery}M`;
+      bat.disabled = G.budget < it.battery;
+      bat.onclick = () => startPlacing(type);
+      box.appendChild(d); continue;
+    }
+    bat.onclick = () => { G.budget -= it.battery; G.spent += it.battery; G.batteries.push(addBattery(sel.value)); say(`נפרסה סוללה חדשה: ${BATTERY_SITES[sel.value][0]}`, 'good'); renderShop(); };
+    box.appendChild(d);
+  }
+  // accelerated rebuilding of hit sites
+  const ruins = CITIES.filter((c) => c.damage.length), d = document.createElement('div');
+  d.className = 'coal';
+  d.innerHTML = `<b>שיקום מואץ</b><p>שיקום מיידי של אתרים שנפגעו, במקום לחכות ${REBUILD} גלים. כל אתר: אמון +1 · כלכלה +1.5</p>`;
+  if (!ruins.length) d.insertAdjacentHTML('beforeend', '<small>אין כרגע אתרים פגועים</small>');
+  for (const c of ruins) {
+    const price = REBUILD_COST * c.damage.length * (c.w >= 7 ? 2 : 1), row = document.createElement('div');
+    row.className = 'buy';
+    row.innerHTML = '<button></button>';
+    const btn = row.querySelector('button');
+    btn.textContent = `${c.name} · ${c.damage.length} אתרים · $${price}M`;
+    btn.disabled = G.budget < price;
+    btn.onclick = () => {
+      G.budget -= price; G.spent += price;
+      G.trust = Math.min(100, G.trust + c.damage.length); G.econ = Math.min(100, G.econ + 1.5 * c.damage.length);
+      c.damage = []; say(`שיקום מואץ הושלם ב${c.name}`, 'good'); renderShop();
+    };
+    d.appendChild(row);
+  }
+  box.appendChild(d);
+}
+function openShop() {
+  if (G.phase === 'intro' || G.phase === 'strike') return;
+  if (G.dipl) closeDipl();
+  if (!$('coop').hidden) closeCoop();
+  panelPause(); renderShop(); $('shop').hidden = false;
+}
+function closeShop() { $('shop').hidden = true; panelResume(); }
+
+// ---------- placing a battery anywhere on the map ----------
+function startPlacing(type) {
+  G.placing = { type }; G.hover = null;
+  $('shop').hidden = true;   // the game stays paused until placing is done
+  flyTo(VIEWS.israel());
+  placeText();
+  $('placeBar').hidden = false; $('log').hidden = true;
+}
+function placeText(extra = '') {
+  const it = SHOP[G.placing.type];
+  $('placeText').textContent = (extra ? extra + ' · ' : '') + `לחץ על המפה בתוך ישראל כדי למקם ${it.name} · $${it.battery}M · תקציב $${Math.round(G.budget)}M`;
+}
+function stopPlacing() {
+  G.placing = null; G.hover = null;
+  $('placeBar').hidden = true; $('log').hidden = false;
+  panelResume();
+}
+const insideIsrael = (w) => REGION.il.some((r) => inPoly(w, r));
+function place(px, py) {
+  const type = G.placing.type, it = SHOP[type], w = toWorld(px, py);
+  if (!insideIsrael(w)) { placeText('אפשר למקם רק בשטח ישראל'); return; }
+  if (G.budget < it.battery) { placeText('אין מספיק תקציב'); return; }
+  G.budget -= it.battery; G.spent += it.battery;
+  const near = CITIES.reduce((a, c) => (dist(c, w) < dist(a, w) ? c : a));
+  const n = G.batteries.filter((b) => b.type === type).length + 1;
+  const name = `קרן אור ${dist(near, w) < 25 ? near.name : n}`;
+  G.batteries.push(makeBattery(`${type}-${n}-${Date.now()}`, type, name, w));
+  say(`נפרסה סוללה חדשה: ${name}`, 'good');
+  placeText(`${name} מוצבת. אפשר למקם עוד אחת`);
+}
+function renderCoalitions() {
+  const box = $('coopList'); box.innerHTML = '';
+  for (const co of COALITIONS) {
+    const d = document.createElement('div'); d.className = 'coal' + (G.coal[co.id] ? ' on' : '');
+    const missing = Object.entries(co.need).filter(([k, v]) => G.p[k] < v);
+    const reqs = Object.entries(co.need).map(([k, v]) => `${PARTNERS[k].name} ${v}+ (כעת ${G.p[k]})`).join(' · ');
+    const cost = Object.entries(co.cost).map(([k, v]) => `${PARTNERS[k].name} ${signed(v)}`).join(' · ');
+    d.innerHTML = '<b></b><p></p><small></small><button></button>';
+    d.querySelector('b').textContent = co.name;
+    d.querySelector('p').textContent = co.desc;
+    d.querySelector('small').textContent = G.coal[co.id] ? 'פעיל · מתפרק אם היחסים יורדים 10 נקודות מתחת לדרישה' : `דרוש: ${reqs}. מחיר: ${cost}`;
+    const btn = d.querySelector('button');
+    btn.textContent = G.coal[co.id] ? '✓ פעיל' : missing.length ? 'היחסים לא מספיקים' : 'להקים שיתוף פעולה';
+    btn.disabled = !!G.coal[co.id] || !!missing.length;
+    btn.onclick = () => {
+      G.coal[co.id] = true;
+      relShift(co.cost); relShift(Object.fromEntries(Object.keys(co.need).map((k) => [k, 5])));
+      say(`הוקם: ${co.name}`, 'good');
+      renderCoalitions();
+    };
+    box.appendChild(d);
+  }
+}
+let pausedByPanel = false;
+// the game pauses while a side panel is open
+function panelPause() {
+  if ($('dipl').hidden && $('coop').hidden && $('shop').hidden) { pausedByPanel = G.phase === 'wave' && !G.paused; if (pausedByPanel) G.paused = true; }
+}
+function panelResume() { if ($('dipl').hidden && $('coop').hidden && $('shop').hidden && pausedByPanel) { G.paused = false; pausedByPanel = false; } }
+function openCoop() {
+  if (G.phase === 'intro' || G.phase === 'strike') return;
+  if (G.dipl) closeDipl();
+  if (!$('shop').hidden) closeShop();
+  panelPause(); renderCoalitions(); $('coop').hidden = false;
+}
+function closeCoop() { $('coop').hidden = true; panelResume(); }
+function openDipl() {
+  if (G.phase === 'intro' || G.phase === 'strike') return;
+  if (!$('coop').hidden) closeCoop();
+  if (!$('shop').hidden) closeShop();
+  panelPause();
+  G.dipl = true; renderDipl(); $('dipl').hidden = false;
+  const t = VIEWS.region();
+  if (W < 520) {
+    // the panel covers the lower half on phones: fit the region into the upper half
+    const box = [km(41.5, 26), km(12.5, 60)], h = box[0].y - box[1].y;
+    t.s = Math.min(W / (box[1].x - box[0].x), H * 0.5 / h) * 0.96;
+    t.cy = (box[0].y + box[1].y) / 2 - H * 0.23 / t.s;
+  }
+  flyTo(t);
+}
+function closeDipl() {
+  G.dipl = false; $('dipl').hidden = true;
+  panelResume();
+  flyTo(VIEWS.israel());
+}
+
+// ---------- messages / HUD ----------
+function say(text, cls = '') {
+  const box = $('log');
+  if (box.lastChild && box.lastChild.textContent === text && box.lastChild.style.opacity !== '0') return;
+  const d = document.createElement('div');
+  d.textContent = text; d.className = cls; box.appendChild(d);
+  while (box.children.length > 4) box.firstChild.remove();
+  setTimeout(() => { d.style.opacity = 0; setTimeout(() => d.remove(), 700); }, 4200);
+}
+function setBar(el, v) {
+  el.style.width = v + '%';
+  el.style.background = v > 55 ? 'var(--green)' : v > 25 ? 'var(--amber)' : 'var(--red)';
+}
+let lastAlertText = '';
+function hud() {
+  setBar($('trustBar'), G.trust); setBar($('relBar'), G.rel); setBar($('detBar'), G.det);
+  $('reserve').textContent = G.reserve;
+  setBar($('econBar'), G.econ);
+  $('budget').textContent = '$' + Math.round(G.budget) + 'M';
+  $('arrows').textContent = G.arrows;
+  $('stunners').textContent = G.stunners;
+  $('kills').textContent = G.kills;
+  $('cost').textContent = '$' + (G.cost >= 1000 ? (G.cost / 1000).toFixed(1) + 'M' : G.cost + 'K');
+  const names = CITIES.filter((c) => c.alert > 0).map((c) => c.name);
+  sirenUpdate(names.length > 0 && G.phase === 'wave' && !G.paused);
+  const text = names.length ? 'צבע אדום: ' + names.join(' · ') : '';
+  if (text !== lastAlertText) {
+    lastAlertText = text;
+    $('alerts').textContent = text;
+    $('alerts').classList.toggle('on', !!text);
+    resize();
+  }
+}
+
+// ---------- view: fit, pan and zoom ----------
+const cv = $('map'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const WORLD = { x0: km(0, 20).x, x1: km(0, 66).x, y0: km(0, 0).y, y1: km(44, 0).y };
+const view = { cx: 0, cy: 0, s: 1, min: 0.05, max: 20, target: null };
+function fitBox(pts, pad = 0) {
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  const x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+  const s = Math.min(W / (x1 - x0), H / (y1 - y0)) * 0.94;
+  return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, s };
+}
+const VIEWS = {
+  israel: () => fitBox([km(33.42, 34.2), km(29.45, 35.95)]),
+  region: () => fitBox([km(41.5, 26), km(12.5, 60)])
+};
+function resize() {
+  const r = cv.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const first = !W;
+  W = r.width; H = r.height; DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  view.min = VIEWS.region().s * 0.8;
+  view.max = VIEWS.israel().s * 8;
+  if (first) Object.assign(view, VIEWS.israel());
+  clampView();
+}
+function clampView() {
+  view.s = clamp(view.s, view.min, view.max);
+  const hw = W / 2 / view.s, hh = H / 2 / view.s;
+  view.cx = WORLD.x1 - WORLD.x0 <= 2 * hw ? (WORLD.x0 + WORLD.x1) / 2 : clamp(view.cx, WORLD.x0 + hw, WORLD.x1 - hw);
+  view.cy = WORLD.y1 - WORLD.y0 <= 2 * hh ? (WORLD.y0 + WORLD.y1) / 2 : clamp(view.cy, WORLD.y0 + hh, WORLD.y1 - hh);
+}
+// smooth camera move; zoom is interpolated in log space so it feels even
+function flyTo(t) { view.target = t; }
+function stepView(dt) {
+  const t = view.target; if (!t) return;
+  const k = 1 - Math.exp(-dt * 5);
+  view.cx += (t.cx - view.cx) * k; view.cy += (t.cy - view.cy) * k;
+  view.s = Math.exp(Math.log(view.s) + (Math.log(t.s) - Math.log(view.s)) * k);
+  clampView();
+  if (Math.abs(Math.log(t.s / view.s)) < 0.01 && Math.hypot(t.cx - view.cx, t.cy - view.cy) * view.s < 1) view.target = null;
+}
+const sx = (x) => W / 2 + (x - view.cx) * view.s;
+const sy = (y) => H / 2 - (y - view.cy) * view.s;
+const toWorld = (px, py) => ({ x: view.cx + (px - W / 2) / view.s, y: view.cy - (py - H / 2) / view.s });
+function zoomAt(px, py, f) {
+  view.target = null;
+  const before = toWorld(px, py);
+  view.s *= f; clampView();
+  const after = toWorld(px, py);
+  view.cx += before.x - after.x; view.cy += before.y - after.y; clampView();
+}
+
+const pts = new Map();
+let gesture = null;
+cv.addEventListener('pointerdown', (e) => {
+  initAudio();
+  cv.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId, { x: e.offsetX, y: e.offsetY, x0: e.offsetX, y0: e.offsetY });
+  if (pts.size === 1) gesture = { moved: false };
+  else if (pts.size === 2) { const [a, b] = [...pts.values()]; gesture = { moved: true, pinch: Math.hypot(a.x - b.x, a.y - b.y) }; }
+});
+cv.addEventListener('pointermove', (e) => { if (G.placing) G.hover = toWorld(e.offsetX, e.offsetY); });
+cv.addEventListener('pointermove', (e) => {
+  const p = pts.get(e.pointerId); if (!p) return;
+  const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
+  p.x = e.offsetX; p.y = e.offsetY;
+  if (pts.size === 1) {
+    if (!gesture.moved && Math.hypot(p.x - p.x0, p.y - p.y0) > 10) gesture.moved = true;
+    if (gesture.moved) { view.target = null; view.cx -= dx / view.s; view.cy += dy / view.s; clampView(); }
+  } else if (pts.size === 2 && gesture.pinch) {
+    const [a, b] = [...pts.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / gesture.pinch);
+    gesture.pinch = d;
+  }
+});
+function endPointer(e) {
+  const p = pts.get(e.pointerId); if (!p) return;
+  pts.delete(e.pointerId);
+  if (!pts.size && gesture && !gesture.moved && e.type === 'pointerup') tap(p.x, p.y);
+  if (!pts.size) gesture = null;
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+
+function tap(px, py) {
+  if (G.placing) return place(px, py);
+  if (G.phase !== 'wave' || G.paused) return;
+  let best = null, bd = 34;
+  for (const th of G.threats) {
+    if (th.dead || !th.cur) continue;
+    const dCur = Math.hypot(sx(th.cur.x) - px, sy(th.cur.y) - py);
+    const d = th.locks ? dCur : Math.min(dCur, Math.hypot(sx(th.to.x) - px, sy(th.to.y) - py)); // a hidden marker can't be tapped
+    const score = d + (th.locks ? 22 : 0); // prefer threats nobody is chasing yet
+    if (score < bd) { bd = score; best = th; }
+  }
+  if (best) engage(best);
+}
+
+// ---------- drawing ----------
+function path(list) { ctx.beginPath(); ring(list); }
+function ring(list) { list.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)))); ctx.closePath(); }
+function label(text, x, y, color, size = 11, weight = 400, align = 'center') {
+  ctx.font = `${weight} ${size}px Rubik, system-ui, sans-serif`;
+  ctx.textAlign = align; ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+function countryFill(code) {
+  if (code === 'il') return G.dipl ? '#1F4A3C' : '#16251F';
+  if (!G.dipl) return '#121A17';
+  if (ENEMY_MAP[code]) return '#3B1416';
+  const p = Object.keys(PARTNERS).find((k) => PARTNERS[k].map === code || (code === 'ncy' && k === 'cy'));
+  return p ? relColor(G.p[p]) : '#1A2220';
+}
+function draw(now) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.direction = 'rtl';
+  ctx.fillStyle = '#0A1A24'; ctx.fillRect(0, 0, W, H);   // sea
+
+  const near = view.s > VIEWS.israel().s * 0.45;
+  for (const [code, rings] of Object.entries(REGION)) {
+    if (code === 'ps') continue;
+    ctx.beginPath(); rings.forEach(ring);
+    ctx.fillStyle = countryFill(code); ctx.fill();
+    ctx.strokeStyle = code === 'il' ? '#2F5A4D' : G.dipl ? 'rgba(10, 20, 18, .9)' : '#22302B'; ctx.lineWidth = code === 'il' ? 1.2 : 0.8; ctx.stroke();
+  }
+  path(GAZA); ctx.fillStyle = G.dipl ? '#3B1416' : '#2A1A18'; ctx.fill(); ctx.strokeStyle = '#6B3A33'; ctx.lineWidth = 1; ctx.stroke();
+  path(WEST_BANK); ctx.fillStyle = countryFill('il'); ctx.fill();
+  ctx.setLineDash([3, 4]); ctx.strokeStyle = '#2C4A41'; ctx.stroke(); ctx.setLineDash([]);
+  path(DEAD_SEA); ctx.fillStyle = '#0A1A24'; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(sx(KINNERET.c.x), sy(KINNERET.c.y), KINNERET.rx * view.s, KINNERET.ry * view.s, 0, 0, Math.PI * 2); ctx.fill();
+
+  // grid that adapts to the zoom level
+  const step = [10, 20, 50, 100, 200, 500].find((g) => g * view.s >= 60) || 1000;
+  const tl = toWorld(0, 0), br = toWorld(W, H);
+  ctx.strokeStyle = 'rgba(61, 220, 151, .05)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = Math.ceil(tl.x / step) * step; x < br.x; x += step) { ctx.moveTo(sx(x), 0); ctx.lineTo(sx(x), H); }
+  for (let y = Math.ceil(br.y / step) * step; y < tl.y; y += step) { ctx.moveTo(0, sy(y)); ctx.lineTo(W, sy(y)); }
+  ctx.stroke();
+
+  for (const l of LABELS) {
+    if ((l.tier === 'near' && !near) || (l.tier === 'far' && near && !G.dipl)) continue;
+    label(l.t, sx(l.x), sy(l.y), G.dipl ? 'rgba(230, 240, 236, .8)' : 'rgba(127, 160, 150, .45)', 13, 500);
+  }
+  if (G.dipl) drawDiplLabels();
+
+  const detail = view.s > 0.7;
+  // battery coverage
+  if (detail && !G.dipl) for (const b of G.batteries) {
+    if (b.type !== 'dome' && b.type !== 'laser') continue;
+    ctx.beginPath(); ctx.arc(sx(b.x), sy(b.y), b.range * view.s, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${SYS_RGB[b.type]}, ${b.type === 'laser' ? 0.06 : 0.025})`; ctx.fill();
+    ctx.setLineDash([2, 5]); ctx.strokeStyle = `rgba(${SYS_RGB[b.type]}, ${b.type === 'laser' ? 0.4 : 0.18})`; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // cities
+  const pulse = 0.5 + 0.5 * Math.sin(now / 160);
+  for (const c of CITIES) {
+    const x = sx(c.x), y = sy(c.y), r = Math.max(detail ? 2.5 : 1.5, c.r * view.s);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    const open = c.alert > 0 && G.threats.some((th) => th.city === c && !th.locks && !th.dead);
+    if (open) { ctx.fillStyle = `rgba(255, 77, 77, ${0.18 + 0.25 * pulse})`; ctx.fill(); ctx.strokeStyle = '#FF4D4D'; }
+    else { ctx.fillStyle = 'rgba(216, 237, 230, .08)'; ctx.fill(); ctx.strokeStyle = 'rgba(216, 237, 230, .35)'; }
+    ctx.lineWidth = 1; ctx.stroke();
+    if (detail && !G.dipl && (c.r >= 3 || view.s > 2.6)) label(c.name, x, y - r - 4, open ? '#FF8A8A' : 'rgba(216, 237, 230, .7)', 11, open ? 700 : 400);
+    if (!detail) continue;
+    // hit sites: red when fresh, turning amber as rebuilding progresses
+    for (let i = 0; i < Math.min(c.damage.length, 6); i++) {
+      const a = i * 2.1, hx = x + Math.cos(a) * r * 0.55, hy = y + Math.sin(a) * r * 0.55;
+      const age = (G.wave - c.damage[i]) / REBUILD;
+      ctx.strokeStyle = age < 0.34 ? '#B33A3A' : age < 0.67 ? '#C2702F' : '#B8A04A'; ctx.lineWidth = 1.5; ctx.beginPath();
+      ctx.moveTo(hx - 2.5, hy - 2.5); ctx.lineTo(hx + 2.5, hy + 2.5); ctx.moveTo(hx + 2.5, hy - 2.5); ctx.lineTo(hx - 2.5, hy + 2.5); ctx.stroke();
+    }
+  }
+
+  // predicted impact points and threats
+  for (const th of G.threats) {
+    if (!th.cur) continue;
+    const x = sx(th.cur.x), y = sy(th.cur.y), ix = sx(th.to.x), iy = sy(th.to.y);
+    const col = th.city ? '#FF4D4D' : '#7D8B87';
+    const ball = th.kind === 'ballistic', heavy = th.kind === 'heavy';
+    // an interceptor is on its way: hide the impact marker and dim the threat, so what is still open stands out
+    ctx.globalAlpha = th.locks ? 0.35 : 1;
+    if (!th.locks) {
+    ctx.setLineDash([2, 4]); ctx.strokeStyle = th.city ? 'rgba(255, 77, 77, .35)' : 'rgba(125, 139, 135, .25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ix, iy); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(ix, iy, th.city ? 6 + 2 * pulse : 5, 0, Math.PI * 2); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+    const left = Math.max(0, th.t0 + th.T - G.t);
+    if (th.city && detail) label(String(Math.ceil(left)), ix, iy + 18, '#FF8A8A', 10, 500);
+    }
+
+    ctx.lineWidth = 1.6;
+    for (let i = 1; i < th.trail.length; i++) {
+      const a = i / th.trail.length;
+      ctx.strokeStyle = ball ? `rgba(232, 121, 249, ${a * 0.8})` : heavy ? `rgba(251, 113, 133, ${a * 0.85})` : th.kind === 'uav' ? `rgba(242, 179, 61, ${a * 0.6})` : `rgba(255, 150, 90, ${a * 0.8})`;
+      ctx.beginPath(); ctx.moveTo(sx(th.trail[i - 1].x), sy(th.trail[i - 1].y)); ctx.lineTo(sx(th.trail[i].x), sy(th.trail[i].y)); ctx.stroke();
+    }
+    if (ball) {
+      ctx.fillStyle = '#E879F9'; ctx.beginPath(); ctx.arc(x, y, 4 + 3 * Math.sin(Math.PI * th.cur.s), 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(232, 121, 249, .5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.stroke();
+    } else if (heavy) {
+      ctx.fillStyle = '#FB7185'; ctx.fillRect(x - 4, y - 4, 8, 8);
+    } else if (th.kind === 'uav') {
+      ctx.fillStyle = '#F2B33D'; ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 5, y); ctx.closePath(); ctx.fill();
+    } else {
+      const h = 4 * th.cur.s * (1 - th.cur.s); // apogee in the middle of the flight
+      ctx.fillStyle = '#FFD2A8'; ctx.beginPath(); ctx.arc(x, y, 2.5 + h * 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (th.locks) { ctx.strokeStyle = '#4FD1E8'; ctx.lineWidth = 1; ctx.strokeRect(x - 8, y - 8, 16, 16); }
+  }
+  drawOffscreen();
+
+  // interceptors
+  for (const it of G.ints) {
+    if (!it.cur) continue;
+    ctx.lineWidth = 1.4;
+    for (let i = 1; i < it.trail.length; i++) {
+      ctx.strokeStyle = `rgba(${SYS_RGB[it.sys]}, ${i / it.trail.length})`;
+      ctx.beginPath(); ctx.moveTo(sx(it.trail[i - 1].x), sy(it.trail[i - 1].y)); ctx.lineTo(sx(it.trail[i].x), sy(it.trail[i].y)); ctx.stroke();
+    }
+    ctx.fillStyle = '#E8FBFF'; ctx.beginPath(); ctx.arc(sx(it.cur.x), sy(it.cur.y), 2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // batteries
+  if (detail && !G.dipl) for (const b of G.batteries) {
+    const x = sx(b.x), y = sy(b.y), dome = b.type === 'dome';
+    const on = `rgb(${SYS_RGB[b.type]})`, off = `rgba(${SYS_RGB[b.type]}, .2)`;
+    ctx.fillStyle = b.flash ? `rgba(232, 251, 255, ${0.5 + b.flash / 2})` : (b.ammo ? on : '#3F5E66');
+    ctx.beginPath();
+    if (b.type === 'arrow') { ctx.moveTo(x, y - 8); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 8); ctx.lineTo(x - 6, y); }
+    else if (b.type === 'sling') { ctx.rect(x - 6, y - 6, 12, 12); }
+    else if (b.type === 'laser') { ctx.arc(x, y, 6, 0, Math.PI * 2); }
+    else { ctx.moveTo(x, y - 7); ctx.lineTo(x + 6.5, y + 5); ctx.lineTo(x - 6.5, y + 5); }
+    ctx.closePath(); ctx.fill();
+    const w = dome ? 3 : b.type === 'laser' ? 14 : 5, gap = 1.5, total = b.mag * (w + gap) - gap;
+    for (let i = 0; i < b.mag; i++) {
+      ctx.fillStyle = i < b.ammo ? on : off;
+      ctx.fillRect(x - total / 2 + i * (w + gap), y + 10, w, 5);
+    }
+    if (!dome || view.s > 4.5) label(b.name, x, y + 27, `rgba(${SYS_RGB[b.type]}, .85)`, 10);
+  }
+
+  // ghost of the battery being placed
+  if (G.placing && G.hover) {
+    const t = G.placing.type, x = sx(G.hover.x), y = sy(G.hover.y), ok = insideIsrael(G.hover);
+    const rgb = ok ? SYS_RGB[t] : '255, 77, 77';
+    ctx.beginPath(); ctx.arc(x, y, SYSTEMS[t].range * view.s, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${rgb}, .12)`; ctx.fill();
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = `rgba(${rgb}, .9)`; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fillStyle = `rgb(${rgb})`; ctx.fill();
+  }
+
+  // strike sorties
+  if (G.phase === 'strike') {
+    for (const S of G.sorties) {
+      const k = clamp((S.t - S.delay) / S.dur, 0, 1);
+      if (S.t < S.delay) continue;
+      const px = S.from.x + (S.to.x - S.from.x) * k, py = S.from.y + (S.to.y - S.from.y) * k;
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(61, 220, 151, .4)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(sx(S.from.x), sy(S.from.y)); ctx.lineTo(sx(px), sy(py)); ctx.stroke(); ctx.setLineDash([]);
+      if (k >= 1) continue;
+      const ang = Math.atan2(-(S.to.y - S.from.y), S.to.x - S.from.x);
+      ctx.save(); ctx.translate(sx(px), sy(py)); ctx.rotate(ang);
+      ctx.fillStyle = S.kill ? '#4FD1E8' : '#3DDC97'; ctx.beginPath();
+      ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-3, 0); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    const planes = G.sorties.filter((s) => !s.kill), n = new Set(planes.map((s) => s.c)).size;
+    label((planes.length ? `${planes.length} מטוסים בדרך ל־${n} יעדים` : '') + (planes.length < G.sorties.length ? (planes.length ? ' · ' : '') + 'מבצע חיסול' : ''), W / 2, 28, '#3DDC97', 14, 700);
+  }
+
+  // effects
+  for (const f of G.fx) {
+    const x = sx(f.x), y = sy(f.y);
+    if (f.kind === 'beam') {
+      const k = Math.min(1, f.t / 0.6);
+      ctx.strokeStyle = `rgba(190, 255, 200, ${1 - k})`; ctx.lineWidth = 3 * (1 - k) + 0.5;
+      ctx.beginPath(); ctx.moveTo(sx(f.bx), sy(f.by)); ctx.lineTo(x, y); ctx.stroke();
+    } else if (f.kind === 'kill') {
+      const k = f.t / 1.5;
+      ctx.beginPath(); ctx.arc(x, y, 4 + k * 18, 0, Math.PI * 2); ctx.strokeStyle = `rgba(255, 240, 180, ${1 - k})`; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, 6 * (1 - k), 0, Math.PI * 2); ctx.fillStyle = `rgba(255, 255, 255, ${1 - k})`; ctx.fill();
+    } else if (f.kind === 'hit') {
+      const k = f.t / 4;
+      ctx.beginPath(); ctx.arc(x, y, 5 + k * 26, 0, Math.PI * 2); ctx.strokeStyle = `rgba(255, 77, 77, ${1 - k})`; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fillStyle = `rgba(255, 110, 60, ${0.9 * (1 - k)})`; ctx.fill();
+    } else if (f.kind === 'miss') {
+      const k = f.t / 1.5;
+      ctx.beginPath(); ctx.arc(x, y, 3 + k * 10, 0, Math.PI * 2); ctx.strokeStyle = `rgba(79, 209, 232, ${0.7 * (1 - k)})`; ctx.lineWidth = 1; ctx.stroke();
+    } else {
+      const k = f.t / 1.5;
+      ctx.beginPath(); ctx.arc(x, y, 3 + k * 9, 0, Math.PI * 2); ctx.fillStyle = `rgba(125, 139, 135, ${0.5 * (1 - k)})`; ctx.fill();
+    }
+  }
+
+  if (G.paused && G.phase === 'wave' && !G.dipl && !G.placing && $('settings').hidden && $('coop').hidden && $('shop').hidden) {
+    ctx.fillStyle = 'rgba(5, 10, 9, .45)'; ctx.fillRect(0, 0, W, H);
+    label('מושהה', W / 2, H / 2, '#D8EDE6', 22, 700);
+  }
+}
+// threats still outside the screen: an arrow on the edge pointing at where they are
+function drawOffscreen() {
+  const m = 18;
+  for (const th of G.threats) {
+    if (!th.cur) continue;
+    const x = sx(th.cur.x), y = sy(th.cur.y);
+    if (x >= 0 && x <= W && y >= 0 && y <= H) continue;
+    const cx = W / 2, cy = H / 2, dx = x - cx, dy = y - cy;
+    const k = Math.min((W / 2 - m) / Math.abs(dx || 1e-6), (H / 2 - m) / Math.abs(dy || 1e-6));
+    const ex = cx + dx * k, ey = cy + dy * k, a = Math.atan2(dy, dx);
+    ctx.save(); ctx.translate(ex, ey); ctx.rotate(a);
+    ctx.fillStyle = { ballistic: '#E879F9', uav: '#F2B33D', heavy: '#FB7185' }[th.kind] || '#FFB088';
+    ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-5, -6); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+function drawDiplLabels() {
+  const spots = { eg: [26.5, 30.5], jo: [31.0, 36.6], sa: [24.5, 44.5], ae: [23.7, 54.2], bh: [26.9, 49.6], qa: [25.3, 51.2], tr: [39.0, 35.0], cy: [35.1, 33.2], gr: [39.3, 22.3] };
+  for (const [code, [a, b]] of Object.entries(spots)) {
+    const k = Object.keys(PARTNERS).find((p) => PARTNERS[p].map === code), pt = km(a, b);
+    label(String(G.p[k]), sx(pt.x), sy(pt.y) + 16, '#FFFFFF', 13, 700);
+  }
+  for (const [code, id] of Object.entries(ENEMY_MAP)) {
+    const l = LABELS.find((x) => x.t === COUNTRIES[id].name);
+    if (l && (l.tier !== 'near' || view.s > VIEWS.israel().s * 0.45)) label('אויב', sx(l.x), sy(l.y) + 16, '#FF9C9C', 11, 500);
+  }
+}
+
+// ---------- loop & controls ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!G.paused) for (let i = 0; i < G.speed; i++) update(dt);
+  stepView(dt);
+  hud(); draw(now);
+  requestAnimationFrame(frame);
+}
+
+function updateVoiceNote() {
+  const n = $('voiceNote'); if (!n) return;
+  n.textContent = heVoice ? '' : 'אין קול עברי במכשיר הזה, ההקראה לא תישמע';
+}
+function syncSettings() {
+  $('setSiren').checked = settings.siren; $('setVoice').checked = settings.voice; $('setSfx').checked = settings.sfx;
+  $('setVol').value = settings.volume;
+  $('setMute').textContent = settings.siren || settings.voice || settings.sfx ? 'השתק הכול' : 'הפעל הכול';
+  if (master) master.gain.value = settings.volume;
+  saveSettings();
+}
+let pausedBySettings = false;
+$('settingsBtn').onclick = () => {
+  initAudio();
+  pausedBySettings = G.phase === 'wave' && !G.paused;
+  if (pausedBySettings) G.paused = true;
+  syncSettings(); updateVoiceNote(); $('settings').hidden = false;
+};
+$('setClose').onclick = () => { $('settings').hidden = true; if (pausedBySettings) G.paused = false; };
+$('setSiren').onchange = (e) => { settings.siren = e.target.checked; syncSettings(); };
+$('setVoice').onchange = (e) => { settings.voice = e.target.checked; if (!e.target.checked) try { speechSynthesis.cancel(); } catch (x) {} syncSettings(); };
+$('setSfx').onchange = (e) => { settings.sfx = e.target.checked; syncSettings(); if (settings.sfx) SFX.intercept(); };
+$('setVol').oninput = (e) => { settings.volume = +e.target.value; syncSettings(); };
+$('setMute').onclick = () => { const on = !(settings.siren || settings.voice || settings.sfx); settings.siren = settings.voice = settings.sfx = on; syncSettings(); };
+
+$('diplBtn').onclick = () => (G.dipl ? closeDipl() : openDipl());
+$('coopBtn').onclick = () => ($('coop').hidden ? openCoop() : closeCoop());
+$('coopClose').onclick = closeCoop;
+$('shopBtn').onclick = () => ($('shop').hidden ? openShop() : closeShop());
+$('shopClose').onclick = closeShop;
+$('placeDone').onclick = stopPlacing;
+$('relBtn').onclick = $('diplBtn').onclick;
+$('diplClose').onclick = closeDipl;
+$('viewIsrael').onclick = () => flyTo(VIEWS.israel());
+$('viewRegion').onclick = () => flyTo(VIEWS.region());
+
+$('startBtn').onclick = () => { initAudio(); clearSave(); $('intro').hidden = true; startWave(); };
+$('resumeBtn').onclick = () => { const d = loadSave(); initAudio(); $('intro').hidden = true; if (d) resumeGame(d); else startWave(); };
+$('againBtn').onclick = () => { $('over').hidden = true; newGame(); flyTo(VIEWS.israel()); startWave(); };
+$('strikeGo').onclick = launchStrikes;
+$('tabAir').onclick = () => setTab('air');
+$('tabKill').onclick = () => setTab('kill');
+$('strikeSkip').onclick = () => { $('strike').hidden = true; startWave(); };
+$('resNext').onclick = () => { $('result').hidden = true; G.sorties = []; flyTo(VIEWS.israel()); startWave(); };
+$('pauseBtn').onclick = () => { if (G.phase !== 'wave' || G.dipl) return; G.paused = !G.paused; $('pauseBtn').textContent = G.paused ? '▶' : '❚❚'; };
+$('speedBtn').onclick = () => { G.speed = G.speed === 1 ? 2 : 1; $('speedBtn').textContent = '×' + G.speed; $('speedBtn').classList.toggle('on', G.speed > 1); };
+document.addEventListener('keydown', (e) => { if (e.code === 'Space' && G.phase === 'wave' && $('settings').hidden) { e.preventDefault(); $('pauseBtn').click(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden && G.phase === 'wave' && !G.paused) $('pauseBtn').click(); });
+window.addEventListener('resize', resize);
+
+const best = +(store.get('idBest') || 0);
+if (best) $('best').textContent = `השיא שלך: ${best} גלים`;
+const saved = loadSave();
+if (saved) {
+  const when = new Date(saved.at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+  $('resumeBtn').textContent = `המשך משמרת · גל ${saved.g.wave + 1}`;
+  $('savedAt').textContent = `נשמר ב־${when}`;
+  $('resumeBtn').hidden = false; $('savedAt').hidden = false;
+  // returning players get the continue button first; the instructions fold away
+  $('introHelp').hidden = true; $('helpBtn').hidden = false;
+  $('helpBtn').onclick = () => { $('introHelp').hidden = !$('introHelp').hidden; $('helpBtn').textContent = $('introHelp').hidden ? 'איך משחקים ▾' : 'איך משחקים ▴'; };
+  $('startBtn').textContent = 'משמרת חדשה (מוחקת את השמורה)';
+  $('startBtn').className = 'ghost'; $('startBtn').style.width = '100%';
+}
+newGame();
+resize();
+requestAnimationFrame(frame);
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+</script>
+</body>
+</html>
