@@ -198,6 +198,13 @@ button.rel:hover, button.rel.open { background: #183029; }
 .coal button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--green); background: #183029; color: var(--green); cursor: pointer; }
 .coal button:disabled { border-color: var(--line); background: transparent; color: var(--muted); cursor: default; }
 .coal.on b { color: var(--green); }
+#coopList h3 { margin: 16px 0 4px; font-size: 12px; color: var(--amber); font-weight: 500; }
+.ach { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.ach .ic { font-size: 22px; filter: grayscale(1); opacity: .4; }
+.ach.got .ic { filter: none; opacity: 1; }
+.ach b { display: block; font-size: 14.5px; font-weight: 500; }
+.ach span { display: block; font-size: 12px; color: var(--muted); }
+.ach.got b { color: var(--green); }
 .buy { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .buy span { flex-basis: 100%; font-size: 11.5px; color: var(--muted); }
 .buy button { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--green); background: #183029; color: var(--green); cursor: pointer; }
@@ -214,6 +221,8 @@ button.rel:hover, button.rel.open { background: #183029; }
 <body>
 <div id="hud">
   <span class="wave">גל <span id="waveNo" class="num">1</span></span>
+  <span class="stat" id="elect"></span>
+  <span class="stat hide-sm">🎖 <b id="rankName"></b></span>
   <span class="meter"><span class="lbl">אמון</span><span class="bar"><i id="trustBar"></i></span></span>
   <button class="meter" id="relBtn" title="מפת יחסי חוץ"><span class="lbl">יחסי חוץ</span><span class="bar"><i id="relBar"></i></span></button>
   <span class="meter"><span class="lbl">הרתעה</span><span class="bar"><i id="detBar"></i></span></span>
@@ -292,9 +301,13 @@ button.rel:hover, button.rel.open { background: #183029; }
         <li>🌐 מפת יחסי החוץ: ארה״ב ואירופה שולחות מיירטים רק כשהיחסים טובים, </li>
         <li>💰 התקציב גדל אחרי כל גל לפי אמון הציבור ומצב הכלכלה. נפילות בערים פוגעות בכלכלה. 🛒 ברכש קונים מיירטים וסוללות.</li>
         <li>🤝 שיתופי פעולה: מדינות עם איום משותף עוזרות ביירוט ובמודיעין.</li>
+        <li>⚡ הפתעות באמצע הגל: מטח לילי מאיראן, מתקפות סייבר, שיבוש GPS, והחלטות בלחץ זמן.</li>
+        <li>🗳 כל 5 גלים יש בחירות. מתחת ל־35 אמון, המשמרת נגמרת.</li>
+        <li>🎖 ניקוד מעלה בדרגה, והישגים נשמרים בין משחקים ונותנים יתרון בפתיחה.</li>
         <li>אם אמון הציבור מגיע לאפס, המשחק נגמר.</li>
       </ul>
       <button class="primary" id="startBtn">התחל משמרת</button>
+      <button class="ghost" id="achBtn" style="width:100%;margin-top:8px">🏅 הישגים</button>
       <p id="best" style="margin:10px 0 0;font-size:12.5px;color:var(--muted);text-align:center"></p>
     </div>
   </div>
@@ -358,10 +371,38 @@ button.rel:hover, button.rel.open { background: #183029; }
     </div>
   </div>
 
+  <div class="overlay" id="dilemma" hidden>
+    <div class="card">
+      <div class="kicker" style="color:var(--red)">החלטה בלחץ זמן · <span id="dlmTime" class="num">8</span></div>
+      <div class="bar" style="width:100%;height:5px;margin-bottom:12px"><i id="dlmBar" style="width:100%;background:var(--red);transition:width 1s linear"></i></div>
+      <p id="dlmText"></p>
+      <div class="opts" id="dlmOpts"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="election" hidden>
+    <div class="card">
+      <div class="kicker">🗳 יום הבחירות</div>
+      <h2 id="elTitle"></h2>
+      <p id="elText"></p>
+      <button class="primary" id="elNext">להמשיך</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="achs" hidden>
+    <div class="card">
+      <div class="kicker">נשמר בין משמרות</div>
+      <h2>🏅 הישגים</h2>
+      <div id="achList"></div>
+      <button class="primary" id="achClose" style="margin-top:12px">סגור</button>
+    </div>
+  </div>
+
   <div class="overlay" id="over" hidden>
     <div class="card">
       <div class="kicker">סוף המשמרת</div>
       <h2 id="overTitle">אמון הציבור קרס</h2>
+      <p id="overNote" hidden></p>
       <div class="grid2" id="overStats"></div>
       <button class="primary" id="againBtn">משמרת חדשה</button>
     </div>
@@ -545,8 +586,58 @@ const COALITIONS = [
   { id: 'egypt', name: 'שיתוף מודיעין עם מצרים', desc: 'מצרים מגבירה את המאבק בהברחות לעזה, ומלאי הרקטות של חמאס מתדלדל: 20% פחות ירי מעזה.',
     need: { eg: 50 }, cost: { qa: -4, tr: -4 } },
   { id: 'hellenic', name: 'ברית עם יוון וקפריסין', desc: 'שטחי אימונים ותחזוקה משותפת: אחרי כל גל חוזר לשירות מטוס אחד שאבד.',
-    need: { gr: 55, cy: 55 }, cost: { tr: -8 } }
+    need: { gr: 55, cy: 55 }, cost: { tr: -8 } },
+  // defence pacts: when a covered front fires at Israel, the ally strikes it and its fire drops the next wave
+  { id: 'us_pact', name: 'ברית הגנה עם ארה״ב', desc: 'כשאיראן, עיראק או תימן יורים על ישראל, ארה״ב תוקפת אותם בתגובה.',
+    need: { us: 70 }, cost: { ru: -8, cn: -8, qa: -3 }, strike: { fronts: ['iran', 'iraq', 'yemen'], by: 'ארה״ב', mult: 0.6 } },
+  { id: 'red_sea', name: 'כוח משימה אירופי בים סוף', desc: 'כשהחות׳ים יורים על ישראל, בריטניה וצרפת תוקפות בתימן.',
+    need: { uk: 55, fr: 50 }, cost: { ru: -3, qa: -2 }, strike: { fronts: ['yemen'], by: 'בריטניה וצרפת', mult: 0.7 } },
+  { id: 'gulf_pact', name: 'ברית תגובה עם סעודיה והאמירויות', desc: 'כשהחות׳ים או איראן יורים, סעודיה והאמירויות תוקפות את החות׳ים ומגבירות את הלחץ על טהרן.',
+    need: { sa: 60, ae: 60 }, cost: { qa: -5, tr: -4 }, strike: { fronts: ['yemen', 'iran'], by: 'סעודיה והאמירויות', mult: 0.75 } },
+  { id: 'egypt_pact', name: 'הבנות ביטחוניות עם מצרים', desc: 'כשחמאס יורה מטחים גדולים, מצרים פועלת נגד המנהרות והמחסנים ברפיח.',
+    need: { eg: 65 }, cost: { qa: -5, tr: -5 }, strike: { fronts: ['gaza'], by: 'מצרים', mult: 0.8 } },
+  { id: 'jordan_pact', name: 'תיאום ביטחוני עם ירדן', desc: 'כשמיליציות בסוריה או בעיראק יורות, ירדן פועלת נגד חוליות השיגור ליד גבולה.',
+    need: { jo: 65 }, cost: { qa: -2 }, strike: { fronts: ['syria', 'iraq'], by: 'ירדן', mult: 0.75 } }
 ];
+
+// ---------- ranks, achievements, elections, events ----------
+const RANKS = [[0, 'סגן מפקד סוללה'], [600, 'מפקד סוללה'], [1600, 'מפקד גדוד'], [3200, 'מפקד חטיבה'], [6000, 'מפקד מערך ההגנה האווירית'], [10000, 'אלוף, מפקד ההגנה האווירית']];
+// Achievements are kept across games; each one gives a head start in every new shift.
+const ACHIEVEMENTS = [
+  { id: 'clean', name: 'חומת ברזל', how: 'גל שלם בלי נפילות בערים (מגל 3)', reward: 'תקציב פתיחה +$20M' },
+  { id: 'hundred', name: 'מאה יירוטים', how: '100 יירוטים במשמרת אחת', reward: '+10 מיירטי כיפה ו־+4 קלע דוד בפתיחה' },
+  { id: 'colonel', name: 'מפקד חטיבה', how: 'להגיע לדרגת מפקד חטיבה', reward: 'קרן אור זמינה כבר מגל 3' },
+  { id: 'diplomat', name: 'דיפלומט', how: 'כל המדינות ביחסים של 50 ומעלה בו זמנית', reward: 'שיתופי פעולה ובריתות דורשים 5 נקודות פחות' },
+  { id: 'elect2', name: 'שתי קדנציות', how: 'לנצח בשתי מערכות בחירות', reward: 'הרתעה +5 בפתיחה' },
+  { id: 'hawk', name: 'יד ארוכה', how: 'לחסל 3 בכירים במשמרת אחת', reward: 'F-35I נוסף בטייסת' },
+  { id: 'whitenight', name: 'לילה לבן', how: 'לעבור גל עם מטח לילי מאיראן בלי נפילות בערים', reward: '+4 מיירטי חץ בפתיחה' }
+];
+const ACH_KEY = 'idAch';
+const achGot = new Set((() => { try { return JSON.parse(localStorage.getItem(ACH_KEY) || '[]'); } catch (e) { return []; } })());
+const hasAch = (id) => achGot.has(id);
+function unlock(id) {
+  if (achGot.has(id)) return;
+  achGot.add(id);
+  try { localStorage.setItem(ACH_KEY, JSON.stringify([...achGot])); } catch (e) {}
+  const a = ACHIEVEMENTS.find((x) => x.id === id);
+  say(`🏅 הישג חדש: ${a.name} · ${a.reward} מהמשמרת הבאה`, 'good');
+}
+const needOf = (v) => v - (hasAch('diplomat') ? 5 : 0);
+const laserFrom = () => (hasAch('colonel') || G.rank >= 3 ? 3 : 5);
+const ELECTION_EVERY = 5;
+// Time-pressure dilemmas: two strategic sites under attack, one interceptor left
+const DILEMMAS = [
+  [{ name: 'בית החולים ברזילי', kind: 'hospital', at: [31.663, 34.563] }, { name: 'תחנת הכוח רוטנברג', kind: 'power', at: [31.625, 34.537] }],
+  [{ name: 'בית החולים רמב״ם', kind: 'hospital', at: [32.835, 34.986] }, { name: 'נמל חיפה', kind: 'port', at: [32.82, 35.0] }],
+  [{ name: 'בית החולים סורוקה', kind: 'hospital', at: [31.258, 34.80] }, { name: 'מפעלי ים המלח', kind: 'industry', at: [31.03, 35.37] }],
+  [{ name: 'בית החולים שיבא', kind: 'hospital', at: [32.046, 34.843] }, { name: 'תחנת הכוח רדינג', kind: 'power', at: [32.10, 34.775] }]
+];
+const SITE_HIT = {
+  hospital: { hint: 'אמון −12', fx: { trust: -12 } },
+  power: { hint: 'כלכלה −12 · תקציב −$15M · הפסקות חשמל', fx: { econ: -12, budget: -15 } },
+  port: { hint: 'כלכלה −10 · תקציב −$20M', fx: { econ: -10, budget: -20 } },
+  industry: { hint: 'כלכלה −8 · תקציב −$10M', fx: { econ: -8, budget: -10 } }
+};
 
 // ---------- defence ----------
 const BATTERY_SITES = {
@@ -676,9 +767,16 @@ function newGame() {
     p: Object.fromEntries(Object.entries(PARTNERS).map(([k, v]) => [k, v.start])),
     fleet: Object.fromEntries(Object.entries(AIRCRAFT).map(([k, a]) => [k, a.count])),
     c: Object.fromEntries(Object.keys(COUNTRIES).map((k) => [k, { active: 0, sup: 1, struck: 0, plan: [], now: 0, recent: 0 }])),
-    lead: {}, coal: {}, diplUsed: {}, diplOpen: null, killPick: null, alliedKills: 0, kills2: 0,
+    lead: {}, coal: {}, diplUsed: {}, diplOpen: null,
+    score: 0, rank: 0, nextElection: ELECTION_EVERY, electionsWon: 0, event: null, jamUntil: 0, killPick: null, alliedKills: 0, kills2: 0,
     batteries: ['sderot', 'ashdod', 'dan', 'haifa', 'galil', 'eilat', 'arrow', 'arrow2', 'sling', 'sling2'].map(addBattery)
   };
+  // head starts from achievements earned in earlier games
+  if (hasAch('clean')) G.budget += 20;
+  if (hasAch('hundred')) { G.reserve += 10; G.stunners += 4; }
+  if (hasAch('elect2')) G.det += 5;
+  if (hasAch('hawk')) G.fleet.f35 += 1;
+  if (hasAch('whitenight')) G.arrows += 4;
   syncRel();
   CITIES.forEach((c) => { c.damage = []; c.alert = 0; });
 }
@@ -697,6 +795,14 @@ function inPoly(p, pts) {
   }
   return inside;
 }
+function addScore(v) {
+  G.score = Math.max(0, G.score + v);
+  while (G.rank + 1 < RANKS.length && G.score >= RANKS[G.rank + 1][0]) {
+    G.rank++; G.budget += 15;
+    say(`🎖 קידום: ${RANKS[G.rank][1]} · תקציב מבצעי +$15M`, 'good');
+    if (G.rank >= 3) unlock('colonel');
+  }
+}
 // between waves: will this country fire in the coming wave? (Lebanon joins from wave 2, i.e. always by the first break)
 const firing = (id) => BASE_FRONTS.includes(id) || G.c[id].active > 0;
 
@@ -705,6 +811,7 @@ function syncRel() {
   let s = 0, w = 0;
   for (const [k, p] of Object.entries(PARTNERS)) { s += G.p[k] * p.w; w += p.w; }
   G.rel = Math.round(s / w);
+  if (Object.values(G.p).every((v) => v >= 50)) unlock('diplomat');
   if (!$('dipl').hidden) renderDipl();
 }
 function relShift(changes, scale = 1) {
@@ -735,7 +842,17 @@ function startWave() {
   const leb = n >= 2 ? Math.min(0.5, 0.2 + 0.08 * n) : 0;
   const count = { gaza: total * (1 - leb), lebanon: total * leb };
   for (const id of Object.keys(COUNTRIES)) if (!BASE_FRONTS.includes(id) && G.c[id].active > 0) count[id] = (COUNTRIES[id].fire + n) * deter(id);
+  // bad relations have a price: patrons arm and fund Israel's enemies
+  const press = [];
+  const feed = (cond, ids, m, text) => { if (!cond) return; ids.forEach((id) => { if (count[id]) count[id] *= m; }); press.push(text); };
+  feed(G.p.ru < 15, ['syria', 'iran'], 1.3, 'רוסיה מחמשת את סוריה ואיראן');
+  feed(G.p.cn < 15, ['iran'], 1.2, 'סין מספקת רכיבי טילים לאיראן');
+  feed(G.p.qa < 10, ['gaza'], 1.15, 'כספים מקטר מגיעים לחמאס');
+  feed(G.p.tr < 10, ['gaza', 'lebanon'], 1.1, 'טורקיה מארחת ומממנת את חמאס');
   const dur = 38 + 6 * n;
+  // a surprise somewhere in the middle of the wave
+  const evs = [['dilemma', n >= 2 ? 1 : 0], ['cyber', n >= 3 ? 1 : 0], ['gps', n >= 3 ? 1 : 0], ['barrage', n >= 5 ? 0.8 : 0]].filter((e) => e[1]);
+  G.event = evs.length && Math.random() < 0.5 ? { type: pick(evs), t: rnd(10, dur * 0.6) } : null;
   const salvos = [];
   for (const id of Object.keys(count)) {
     const planMult = G.c[id].plan.length ? G.c[id].plan[0] : 1;
@@ -762,6 +879,7 @@ function startWave() {
   $('waveNo').textContent = n;
   say(`גל ${n} החל · ירי מ${fronts.join(', ')}`, 'warn');
   news.forEach((m) => say(m, 'bad'));
+  press.forEach((m) => say(m, 'bad'));
   if (detT <= 0.8) say(`הרתעה גבוהה: ארגוני הטרור מצמצמים ירי ב־${Math.round((1 - detT) * 100)}%`, 'good');
   else if (detT >= 1.2) say('הרתעה נמוכה: ארגוני הטרור מגבירים את הירי', 'bad');
   if (Object.keys(count).some((id) => COUNTRIES[id].kinds.some((k) => k[0] === 'ballistic'))) say('טילים בליסטיים בדרך: חץ וקלע דוד מיירטים אותם. לחץ ״המזרח התיכון״ כדי לראות אותם', 'warn');
@@ -786,7 +904,9 @@ function spawn(q) {
     if (G.coal[co.id] && ic && ic.fronts.includes(q.front) && ic.kinds.includes(q.kind) && Math.random() < ic.p) { th.allied = { at: rnd(0.3, 0.65), by: ic.by }; break; }
   }
   G.threats.push(th);
-  if (hitCity) { hitCity.alert++; announce(hitCity.name); }
+  th.fuzzy = G.jamUntil > G.t;
+  if (th.fuzzy) { th.jx = rnd(-9, 9); th.jy = rnd(-9, 9); }
+  else if (hitCity) { hitCity.alert++; th.alerted = true; announce(hitCity.name); }
   if (q.kind !== 'ballistic' && dist(from, { x: 0, y: 0 }) < 250) SFX.enemyLaunch();
 }
 function posOf(th, t) {
@@ -809,7 +929,7 @@ function engage(th) {
   if (!th || th.dead) return;
   let best = null, any = false;
   for (const b of G.batteries) {
-    if (!canEngage(b, th)) continue;
+    if (!canEngage(b, th) || b.offUntil > G.t) continue;
     const sol = solve(b, th);
     if (!sol) continue;
     any = true;
@@ -838,9 +958,11 @@ function update(dt) {
   if (G.phase !== 'wave') return;
   G.t += dt;
   while (G.queue.length && G.queue[0].t <= G.t) spawn(G.queue.shift());
+  if (G.event && !G.event.done && G.t >= G.event.t) triggerEvent();
 
   for (const b of G.batteries) {
     b.flash = Math.max(0, b.flash - dt * 2);
+    if (b.offUntil > G.t) continue;
     const stock = b.stock; // the laser has no stock: it just recharges
     if (b.ammo < b.mag && (!stock || G[stock] > 0)) {
       b.reloadT -= dt;
@@ -859,7 +981,9 @@ function update(dt) {
       if (th.dead) continue;
       if (it.kill) {
         th.dead = true; G.kills++;
-        if (th.city) th.city.alert--;
+        if (th.alerted) th.city.alert--;
+        addScore(th.city ? 10 : 3);
+        if (G.kills >= 100) unlock('hundred');
         G.fx.push({ x: it.p.x, y: it.p.y, t: 0, kind: 'kill' });
         SFX.intercept();
         if (th.city) say(`יירוט מוצלח מעל ${th.city.name}`, 'good');
@@ -875,10 +999,11 @@ function update(dt) {
     if (th.dead) continue;
     const p = posOf(th, G.t);
     th.cur = p;
+    if (th.fuzzy && p.s >= 0.65) { th.fuzzy = false; if (th.city) { th.city.alert++; th.alerted = true; announce(th.city.name); } }
     th.trail.push({ x: p.x, y: p.y }); if (th.trail.length > 26) th.trail.shift();
     if (th.allied && p.s >= th.allied.at) {
       th.dead = true; G.alliedKills++;
-      if (th.city) th.city.alert--;
+      if (th.alerted) th.city.alert--;
       G.fx.push({ x: p.x, y: p.y, t: 0, kind: 'kill' });
       say(`יורט בידי ${th.allied.by}`, 'good');
       continue;
@@ -887,7 +1012,9 @@ function update(dt) {
       th.dead = true;
       if (th.city) {
         G.c[th.front].now += 2;
-        th.city.alert--; th.city.damage.push(G.wave); G.cityHits++; G.waveHits++;
+        if (th.alerted) th.city.alert--;
+        addScore(-15);
+        th.city.damage.push(G.wave); G.cityHits++; G.waveHits++;
         const loss = th.city.w * G.shelter * ({ ballistic: 1.6, heavy: 1.3 }[th.kind] || 1);
         G.trust = Math.max(0, G.trust - loss);
         G.econ = Math.max(0, G.econ - th.city.w * 0.35);
@@ -906,6 +1033,52 @@ function update(dt) {
   if (G.trust <= 0) return gameOver();
   if (!G.queue.length && !G.threats.length && !G.ints.length) endWave();
 }
+function triggerEvent() {
+  const e = G.event; e.done = true;
+  if (e.type === 'barrage') {
+    e.barrage = true;
+    for (let i = 0; i < 12 + G.wave; i++) G.queue.push({ t: G.t + rnd(0, 6), front: 'iran', kind: Math.random() < 0.8 ? 'ballistic' : 'heavy' });
+    G.queue.sort((a, b) => a.t - b.t);
+    say('🌙 לילה לבן: מטח טילים ענק מאיראן! חץ וקלע דוד לעמדות', 'bad');
+  } else if (e.type === 'cyber') {
+    const pool = G.batteries.filter((b) => b.type === 'dome' || b.type === 'sling');
+    const b = pool[Math.floor(Math.random() * pool.length)];
+    b.offUntil = G.t + 20;
+    say(`💻 מתקפת סייבר: סוללת ${b.name} מושבתת ל־20 שניות`, 'bad');
+  } else if (e.type === 'gps') {
+    G.jamUntil = G.t + 25;
+    say('📡 שיבוש GPS: נקודות הפגיעה של איומים חדשים לא ידועות עד שלב מאוחר', 'bad');
+  } else if (e.type === 'dilemma') openDilemma();
+}
+let dilemmaTimer = null;
+function openDilemma() {
+  const [a, b] = DILEMMAS[Math.floor(Math.random() * DILEMMAS.length)];
+  const wasPaused = G.paused; G.paused = true;
+  $('dlmText').textContent = `שני טילים כבדים בדרך: אל ${a.name} ואל ${b.name}. בסוללה הקרובה נשאר מיירט אחד. החלט עכשיו.`;
+  const box = $('dlmOpts'); box.innerHTML = '';
+  let left = 8;
+  const done = (save) => {
+    clearInterval(dilemmaTimer); $('dilemma').hidden = true;
+    if (!wasPaused) G.paused = false;
+    const hit = [];
+    for (const site of [a, b]) {
+      const pos = km(...site.at), saved = save === site || (save === 'both' && Math.random() < 0.5);
+      G.fx.push({ x: pos.x, y: pos.y, t: 0, kind: saved ? 'kill' : 'hit' });
+      if (saved) say(`יירוט מעל ${site.name}`, 'good');
+      else { hit.push(site.name); applyFx(Object.assign({}, SITE_HIT[site.kind].fx, { shelter: G.shelter })); }
+    }
+    if (hit.length) { say(`פגיעה ב${hit.join(' וב')}`, 'bad'); SFX.impact(); }
+    if (hit.length < 2) addScore(30);
+  };
+  box.appendChild(optButton(`ליירט מעל ${a.name}`, `${b.name} ייפגע: ${SITE_HIT[b.kind].hint}`, () => done(a)));
+  box.appendChild(optButton(`ליירט מעל ${b.name}`, `${a.name} ייפגע: ${SITE_HIT[a.kind].hint}`, () => done(b)));
+  box.appendChild(optButton('לשגר מסוללה רחוקה לשניהם', 'סיכוי של 50% לכל אחד מהם', () => done('both')));
+  const tick = () => { $('dlmTime').textContent = left; $('dlmBar').style.width = (left / 8 * 100) + '%'; };
+  tick();
+  dilemmaTimer = setInterval(() => { left--; tick(); if (left <= 0) { say('לא התקבלה החלטה בזמן', 'bad'); done(null); } }, 1000);
+  $('dilemma').hidden = false;
+  SFX.denied();
+}
 function stepFx(dt) {
   G.fx.forEach((f) => (f.t += dt));
   G.fx = G.fx.filter((f) => f.t < (f.kind === 'hit' ? 4 : f.kind === 'beam' ? 0.6 : 1.5));
@@ -919,11 +1092,20 @@ function endWave() {
   G.reserve += us + eu;
   if (G.p.us >= 50) { G.arrows += 1; G.stunners += 2; }
   G.det = Math.max(0, G.det - 3);
+  // defence pacts: allies hit back at whoever fired at Israel in this wave
+  for (const co of COALITIONS) {
+    if (!G.coal[co.id] || !co.strike) continue;
+    for (const id of co.strike.fronts) {
+      if (G.c[id].now < 6) continue;
+      G.c[id].sup *= co.strike.mult; G.det = Math.min(100, G.det + 2);
+      say(`${co.strike.by} תקפה ב${COUNTRIES[id].name} בתגובה לשיגורים על ישראל`, 'good');
+    }
+  }
   for (const c of Object.values(G.c)) { c.recent = c.recent * 0.5 + c.now; c.now = 0; }
   // coalitions fall apart when relations with a member sink well below what it took to form them
   for (const co of COALITIONS) {
     if (!G.coal[co.id]) continue;
-    const broke = Object.entries(co.need).find(([k, v]) => G.p[k] < v - 10);
+    const broke = Object.entries(co.need).find(([k, v]) => G.p[k] < needOf(v) - 10);
     if (broke) { G.coal[co.id] = false; say(`${co.name} התפרקה: היחסים עם ${PARTNERS[broke[0]].name} הידרדרו`, 'bad'); }
   }
   if (G.coal.hellenic) {
@@ -931,6 +1113,11 @@ function endWave() {
     if (t) { G.fleet[t]++; say(`${AIRCRAFT[t].name} חזר לשירות בזכות הברית עם יוון וקפריסין`, 'good'); }
   }
   if (!G.waveHits) G.trust = Math.min(100, G.trust + 4);
+  addScore(G.waveHits ? 50 : 100);
+  if (!G.waveHits && G.wave >= 3) unlock('clean');
+  if (!G.waveHits && G.event && G.event.barrage) unlock('whitenight');
+  G.event = null; G.jamUntil = 0;
+  G.batteries.forEach((b) => (b.offUntil = 0));
   // the treasury: income grows with public trust and with an economy that isn't being hit
   const rebuilt = [];
   let ruins = 0;
@@ -949,9 +1136,34 @@ function endWave() {
   say(G.waveHits ? `גל ${G.wave} הסתיים · ${G.waveHits} נפילות בערים` : `גל ${G.wave} הסתיים ללא נפילות בערים`, G.waveHits ? 'warn' : 'good');
   say(us + eu ? `סיוע${us ? ' אמריקאי' : ''}${eu ? (us ? ' ואירופי' : ' אירופי') : ''}: +${us + eu} מיירטים למלאי` : 'בידוד מדיני: לא התקבל סיוע', us + eu ? 'good' : 'bad');
   CITIES.forEach((c) => (c.alert = 0));
+  if (G.wave >= G.nextElection) { setTimeout(runElection, 1400); return; }
   saveGame();
   setTimeout(showDecision, 1400);
 }
+
+// ---------- elections ----------
+function runElection() {
+  if (G.phase === 'over') return;
+  const t = Math.round(G.trust);
+  G.nextElection += ELECTION_EVERY;
+  if (t < 35) return gameOver('הפסדת בבחירות', `אמון הציבור עמד על ${t} ביום הבחירות. נדרש לפחות 35.`);
+  let title, text;
+  if (t >= 50) {
+    G.electionsWon++; G.budget += 30; G.det = Math.min(100, G.det + 5); addScore(200);
+    title = 'ניצחון בבחירות'; text = `אמון הציבור: ${t}. מנדט חזק: תקציב +$30M, הרתעה +5.`;
+    if (G.electionsWon >= 2) unlock('elect2');
+  } else {
+    G.electionsWon++; G.budget = Math.max(0, G.budget - 25); addScore(80);
+    title = 'ניצחון דחוק'; text = `אמון הציבור: ${t}. השותפות הקואליציוניות סוחטות הטבות: תקציב −$25M.`;
+  }
+  $('elTitle').textContent = title; $('elText').textContent = text + ` הבחירות הבאות אחרי גל ${G.nextElection}.`;
+  $('election').hidden = false;
+  saveGame();
+}
+const CAMPAIGN = { id: 'campaign', title: 'בחירות בעוד גל אחד', text: 'היועצים מציעים מהלך שיעלה את האמון לפני הקלפי. אחרי הגל הבא תיבחן: מתחת ל־35 אמון, המשמרת נגמרת.', opts: [
+  { label: 'מבצע ראוותני', hint: 'אמון +10 · הרתעה +5 · כולם −6', fx: { trust: 10, det: 5, rel: -6 } },
+  { label: 'מענקים לתושבי הדרום והצפון', hint: 'אמון +8 · תקציב −$40M · כלכלה +3', fx: { trust: 8, budget: -40, econ: 3 } },
+  { label: 'להתמקד בעבודה', hint: 'הרתעה +2', fx: { det: 2 } }] };
 
 // ---------- cabinet decisions ----------
 // fx.rel moves every partner; fx.relTo moves specific ones
@@ -981,6 +1193,21 @@ const CARDS = [
   { id: 'home', title: 'פיקוד העורף', text: 'פיקוד העורף מבקש להחמיר את ההנחיות ולסגור מוסדות לימוד ומקומות עבודה.', opts: [
     { label: 'להחמיר הנחיות', hint: 'נפילות בערים פוגעות פחות באמון בגל הבא · אמון −3 · כלכלה −8', fx: { shelter: 0.5, trust: -3, econ: -8 } },
     { label: 'שגרה ככל האפשר', hint: 'אמון +3 · כלכלה +3', fx: { trust: 3, econ: 3 } }] },
+  { id: 'pact_offer', title: 'הצעה לברית הגנה', text: 'וושינגטון מציעה ברית: כל שיגור מאיראן, עיראק או תימן ייענה בתקיפה אמריקאית.', when: () => G.p.us >= needOf(65) && !G.coal.us_pact, opts: [
+    { label: 'לחתום', hint: 'ברית הגנה עם ארה״ב · רוסיה וסין −8 · קטר −3', fx: { coal: 'us_pact', relTo: { ru: -8, cn: -8, qa: -3 } } },
+    { label: 'לשמור על חופש פעולה', hint: 'ארה״ב −3 · הרתעה +2', fx: { relTo: { us: -3 }, det: 2 } }] },
+  { id: 'red_sea', title: 'משבר השיט בים סוף', text: 'בריטניה וצרפת מציעות כוח משימה שיגיב לכל שיגור של החות׳ים.', when: () => (G.c.yemen.active > 0 || G.c.yemen.struck > 0) && !G.coal.red_sea, opts: [
+    { label: 'להצטרף לכוח המשימה', hint: 'בריטניה וצרפת יתקפו בתימן אחרי שיגורים · רוסיה −3', fx: { coal: 'red_sea', relTo: { uk: 3, fr: 3, ru: -3 } } },
+    { label: 'לפעול לבד', hint: 'הרתעה +2', fx: { det: 2 } }] },
+  { id: 'russia_arms', title: 'נשק רוסי לסוריה', text: 'רוסיה שוקלת להעביר מערכות נשק לסוריה. ביחסים גרועים עם מוסקבה, סוריה ואיראן יורים יותר.', opts: [
+    { label: 'להכיר בתפקיד הרוסי בסוריה', hint: 'רוסיה +10 · ארה״ב −4', fx: { relTo: { ru: 10, us: -4 } } },
+    { label: 'לאיים בפומבי', hint: 'רוסיה −10 · הרתעה +3', fx: { relTo: { ru: -10 }, det: 3 } }] },
+  { id: 'qatar_funds', title: 'כספי קטר לעזה', text: 'קטר מבקשת להעביר כספים לרצועה. ביחסים גרועים עם דוחה, הכסף מגיע לחמאס בכל מקרה.', opts: [
+    { label: 'לאשר בפיקוח', hint: 'קטר +8 · ארה״ב −2 · יותר ירי מעזה בגל הבא', fx: { relTo: { qa: 8, us: -2 }, gaza: 1.1 } },
+    { label: 'לחסום', hint: 'קטר −10 · פחות ירי מעזה בגל הבא', fx: { relTo: { qa: -10 }, gaza: 0.9 } }] },
+  { id: 'flotilla', title: 'משט טורקי לעזה', text: 'משט בחסות טורקיה יצא לכיוון הרצועה. ביחסים גרועים עם אנקרה, היא מממנת את חמאס.', opts: [
+    { label: 'לאפשר פריקה באשדוד', hint: 'טורקיה +8 · אמון −3', fx: { relTo: { tr: 8 }, trust: -3 } },
+    { label: 'להשתלט על המשט', hint: 'טורקיה −12 · הרתעה +3', fx: { relTo: { tr: -12 }, det: 3 } }] },
   { id: 'aid', title: 'חבילת סיוע אמריקאית', text: 'הממשל מציע סיוע כספי חירום, בתנאי שישראל תתאם איתו את המהלכים הבאים.', when: () => G.p.us >= 50, opts: [
     { label: 'לקבל', hint: 'תקציב +$60M · ארה״ב +3 · הרתעה −4', fx: { budget: 60, relTo: { us: 3 }, det: -4 } },
     { label: 'לסרב', hint: 'הרתעה +3', fx: { det: 3 } }] },
@@ -1003,7 +1230,7 @@ function showDecision() {
   const deployed = new Set(G.batteries.map((b) => b.id));
   let pool = CARDS.filter((c) => !G.usedCards.slice(-3).includes(c.id) && (!c.when || c.when()));
   pool = pool.filter((c) => c.id !== 'battery' || !(deployed.has('jlm') && deployed.has('bs')));
-  const card = pool[Math.floor(Math.random() * pool.length)];
+  const card = G.nextElection - G.wave === 1 ? CAMPAIGN : pool[Math.floor(Math.random() * pool.length)];
   G.usedCards.push(card.id);
   $('decKicker').textContent = `החלטת קבינט · לפני גל ${G.wave + 1}`;
   $('decTitle').textContent = card.title;
@@ -1037,7 +1264,8 @@ function applyFx(fx) {
   if (fx.lebanon) G.c.lebanon.sup *= fx.lebanon;
   if (fx.shelter) G.shelter = fx.shelter;
   if (fx.econ) G.econ = clamp(G.econ + fx.econ, 0, 100);
-  if (fx.budget) G.budget += fx.budget;
+  if (fx.budget) G.budget = Math.max(0, G.budget + fx.budget);
+  if (fx.coal) { G.coal[fx.coal] = true; say(`נחתם: ${COALITIONS.find((c) => c.id === fx.coal).name}`, 'good'); }
   if (fx.battery) { G.batteries.push(addBattery(fx.battery)); say(`נפרסה סוללה חדשה: ${BATTERY_SITES[fx.battery][0]}`, 'good'); }
 }
 
@@ -1249,6 +1477,8 @@ function resolveStrikes() {
       hitsAll++; G.kills2++;
       st.dead = G.wave; st.alert = 0;
       G.det = clamp(G.det + L.det, 0, 100);
+      addScore(60);
+      if (G.kills2 >= 3) unlock('hawk');
       relShift(leaderReact(L));
       // revenge first, then disarray
       L.after.forEach((m, i) => (c.plan[i] = (c.plan[i] ?? 1) * m));
@@ -1301,13 +1531,15 @@ function resumeGame(d) {
   showDecision();
 }
 
-function gameOver() {
+function gameOver(title = 'אמון הציבור קרס', note = '') {
   G.phase = 'over';
+  clearInterval(dilemmaTimer); $('dilemma').hidden = true;
   clearSave();
   const best = Math.max(+(store.get('idBest') || 0), G.wave - 1);
   store.set('idBest', best);
-  $('overTitle').textContent = 'אמון הציבור קרס';
-  const rows = [['גלים שהושלמו', G.wave - 1], ['יירוטים', G.kills], ['נפילות בערים', G.cityHits], ['מיירטים ששוגרו', G.fired], ['תקיפות', G.strikes], ['מטוסים שהופלו', G.lost], ['בכירים שחוסלו', G.kills2], ['יירוטים של שותפים', G.alliedKills], ['יחסי חוץ', G.rel], ['עלות המיירטים ששוגרו', '$' + (G.cost / 1000).toFixed(1) + 'M'], ['הוצאות רכש ומבצעים', '$' + Math.round(G.spent) + 'M'], ['שיא אישי', best + ' גלים']];
+  $('overTitle').textContent = title;
+  $('overNote').textContent = note; $('overNote').hidden = !note;
+  const rows = [['דרגה', RANKS[G.rank][1]], ['ניקוד', G.score], ['בחירות שנוצחו', G.electionsWon], ['גלים שהושלמו', G.wave - 1], ['יירוטים', G.kills], ['נפילות בערים', G.cityHits], ['מיירטים ששוגרו', G.fired], ['תקיפות', G.strikes], ['מטוסים שהופלו', G.lost], ['בכירים שחוסלו', G.kills2], ['יירוטים של שותפים', G.alliedKills], ['יחסי חוץ', G.rel], ['עלות המיירטים ששוגרו', '$' + (G.cost / 1000).toFixed(1) + 'M'], ['הוצאות רכש ומבצעים', '$' + Math.round(G.spent) + 'M'], ['שיא אישי', best + ' גלים']];
   $('overStats').innerHTML = rows.map(([k, v]) => `<div>${k}<b class="num">${v}</b></div>`).join('');
   $('over').hidden = false;
 }
@@ -1358,10 +1590,10 @@ function renderShop() {
   for (const [type, it] of Object.entries(SHOP)) {
     const stock = SYSTEMS[type].stock, d = document.createElement('div');
     d.className = 'coal';
-    if (it.fromWave && G.wave < it.fromWave) {
+    if (it.fromWave && G.wave < laserFrom()) {
       d.innerHTML = '<b></b><p></p><small></small>';
       d.querySelector('b').textContent = it.name; d.querySelector('p').textContent = it.what;
-      d.querySelector('small').textContent = `בפיתוח ברפא״ל · זמין מגל ${it.fromWave} · $${it.battery}M לסוללה`;
+      d.querySelector('small').textContent = `בפיתוח ברפא״ל · זמין מגל ${laserFrom()} (או מדרגת מפקד חטיבה) · $${it.battery}M לסוללה`;
       box.appendChild(d); continue;
     }
     const free = Object.entries(BATTERY_SITES).filter(([id, v]) => (v[3] || 'dome') === type && !G.batteries.some((b) => b.id === id));
@@ -1451,10 +1683,15 @@ function place(px, py) {
 }
 function renderCoalitions() {
   const box = $('coopList'); box.innerHTML = '';
+  let pactHead = false;
   for (const co of COALITIONS) {
+    if (co.strike && !pactHead) {
+      pactHead = true;
+      const h = document.createElement('h3'); h.textContent = 'בריתות הגנה: תגובה לשיגורים על ישראל'; box.appendChild(h);
+    }
     const d = document.createElement('div'); d.className = 'coal' + (G.coal[co.id] ? ' on' : '');
-    const missing = Object.entries(co.need).filter(([k, v]) => G.p[k] < v);
-    const reqs = Object.entries(co.need).map(([k, v]) => `${PARTNERS[k].name} ${v}+ (כעת ${G.p[k]})`).join(' · ');
+    const missing = Object.entries(co.need).filter(([k, v]) => G.p[k] < needOf(v));
+    const reqs = Object.entries(co.need).map(([k, v]) => `${PARTNERS[k].name} ${needOf(v)}+ (כעת ${G.p[k]})`).join(' · ');
     const cost = Object.entries(co.cost).map(([k, v]) => `${PARTNERS[k].name} ${signed(v)}`).join(' · ');
     d.innerHTML = '<b></b><p></p><small></small><button></button>';
     d.querySelector('b').textContent = co.name;
@@ -1523,6 +1760,9 @@ let lastAlertText = '';
 function hud() {
   setBar($('trustBar'), G.trust); setBar($('relBar'), G.rel); setBar($('detBar'), G.det);
   $('reserve').textContent = G.reserve;
+  const toVote = G.nextElection - G.wave;
+  $('elect').textContent = toVote <= 2 && G.phase !== 'intro' ? (toVote <= 0 ? '🗳 בחירות אחרי הגל הזה' : `🗳 בחירות בעוד ${toVote}`) : '';
+  $('rankName').textContent = RANKS[G.rank][1];
   setBar($('econBar'), G.econ);
   $('budget').textContent = '$' + Math.round(G.budget) + 'M';
   $('arrows').textContent = G.arrows;
@@ -1634,7 +1874,7 @@ function tap(px, py) {
   for (const th of G.threats) {
     if (th.dead || !th.cur) continue;
     const dCur = Math.hypot(sx(th.cur.x) - px, sy(th.cur.y) - py);
-    const d = th.locks ? dCur : Math.min(dCur, Math.hypot(sx(th.to.x) - px, sy(th.to.y) - py)); // a hidden marker can't be tapped
+    const d = th.locks || th.fuzzy ? dCur : Math.min(dCur, Math.hypot(sx(th.to.x) - px, sy(th.to.y) - py)); // a hidden marker can't be tapped
     const score = d + (th.locks ? 22 : 0); // prefer threats nobody is chasing yet
     if (score < bd) { bd = score; best = th; }
   }
@@ -1724,7 +1964,14 @@ function draw(now) {
     const ball = th.kind === 'ballistic', heavy = th.kind === 'heavy';
     // an interceptor is on its way: hide the impact marker and dim the threat, so what is still open stands out
     ctx.globalAlpha = th.locks ? 0.35 : 1;
-    if (!th.locks) {
+    if (th.fuzzy && !th.locks) {
+      // GPS jamming: only a rough area, and no telling yet whether it is a city
+      const fx = sx(th.to.x + th.jx), fy = sy(th.to.y + th.jy);
+      ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(242, 179, 61, .8)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(fx, fy, Math.max(14, 12 * view.s), 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      label('?', fx, fy + 5, '#F2B33D', 14, 700);
+    }
+    if (!th.locks && !th.fuzzy) {
     ctx.setLineDash([2, 4]); ctx.strokeStyle = th.city ? 'rgba(255, 77, 77, .35)' : 'rgba(125, 139, 135, .25)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ix, iy); ctx.stroke(); ctx.setLineDash([]);
     ctx.beginPath(); ctx.arc(ix, iy, th.city ? 6 + 2 * pulse : 5, 0, Math.PI * 2); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
@@ -1768,8 +2015,9 @@ function draw(now) {
   // batteries
   if (detail && !G.dipl) for (const b of G.batteries) {
     const x = sx(b.x), y = sy(b.y), dome = b.type === 'dome';
-    const on = `rgb(${SYS_RGB[b.type]})`, off = `rgba(${SYS_RGB[b.type]}, .2)`;
-    ctx.fillStyle = b.flash ? `rgba(232, 251, 255, ${0.5 + b.flash / 2})` : (b.ammo ? on : '#3F5E66');
+    const on = `rgb(${SYS_RGB[b.type]})`, dim = `rgba(${SYS_RGB[b.type]}, .2)`;
+    const off = b.offUntil > G.t;
+    ctx.fillStyle = off ? '#5A2A2A' : b.flash ? `rgba(232, 251, 255, ${0.5 + b.flash / 2})` : (b.ammo ? on : '#3F5E66');
     ctx.beginPath();
     if (b.type === 'arrow') { ctx.moveTo(x, y - 8); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 8); ctx.lineTo(x - 6, y); }
     else if (b.type === 'sling') { ctx.rect(x - 6, y - 6, 12, 12); }
@@ -1778,9 +2026,10 @@ function draw(now) {
     ctx.closePath(); ctx.fill();
     const w = dome ? 3 : b.type === 'laser' ? 14 : 5, gap = 1.5, total = b.mag * (w + gap) - gap;
     for (let i = 0; i < b.mag; i++) {
-      ctx.fillStyle = i < b.ammo ? on : off;
+      ctx.fillStyle = i < b.ammo ? on : dim;
       ctx.fillRect(x - total / 2 + i * (w + gap), y + 10, w, 5);
     }
+    if (off) label('⚠ סייבר', x, y - 12, '#FF8A8A', 10, 700);
     if (!dome || view.s > 4.5) label(b.name, x, y + 27, `rgba(${SYS_RGB[b.type]}, .85)`, 10);
   }
 
@@ -1910,6 +2159,20 @@ $('coopBtn').onclick = () => ($('coop').hidden ? openCoop() : closeCoop());
 $('coopClose').onclick = closeCoop;
 $('shopBtn').onclick = () => ($('shop').hidden ? openShop() : closeShop());
 $('shopClose').onclick = closeShop;
+$('elNext').onclick = () => { $('election').hidden = true; showDecision(); };
+$('achBtn').onclick = () => {
+  $('achList').innerHTML = '';
+  for (const a of ACHIEVEMENTS) {
+    const d = document.createElement('div'); d.className = 'ach' + (hasAch(a.id) ? ' got' : '');
+    d.innerHTML = '<div class="ic">🏅</div><div><b></b><span></span><span></span></div>';
+    d.querySelector('b').textContent = a.name;
+    const [how, rew] = d.querySelectorAll('span');
+    how.textContent = a.how; rew.textContent = (hasAch(a.id) ? '✓ ' : 'פרס: ') + a.reward;
+    $('achList').appendChild(d);
+  }
+  $('achs').hidden = false;
+};
+$('achClose').onclick = () => { $('achs').hidden = true; };
 $('placeDone').onclick = stopPlacing;
 $('relBtn').onclick = $('diplBtn').onclick;
 $('diplClose').onclick = closeDipl;
